@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2013 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -9,9 +9,6 @@
 
 import
   options, strutils, os, tables, ropes, platform
-
-when useCaas:
-  import sockets
 
 type 
   TMsgKind* = enum 
@@ -72,7 +69,7 @@ type
     errInvalidOrderInArrayConstructor,
     errInvalidOrderInEnumX, errEnumXHasHoles, errExceptExpected, errInvalidTry, 
     errOptionExpected, errXisNoLabel, errNotAllCasesCovered, 
-    errUnkownSubstitionVar, errComplexStmtRequiresInd, errXisNotCallable, 
+    errUnknownSubstitionVar, errComplexStmtRequiresInd, errXisNotCallable, 
     errNoPragmasAllowedForX, errNoGenericParamsAllowedForX, 
     errInvalidParamKindX, errDefaultArgumentInvalid, errNamedParamHasToBeIdent, 
     errNoReturnTypeForX, errConvNeedsOneArg, errInvalidPragmaX, 
@@ -92,7 +89,7 @@ type
     errTIsNotAConcreteType,
     errInvalidSectionStart, errGridTableNotImplemented, errGeneralParseError, 
     errNewSectionExpected, errWhitespaceExpected, errXisNoValidIndexFile, 
-    errCannotRenderX, errVarVarTypeNotAllowed, errInstantiateXExplicitely,
+    errCannotRenderX, errVarVarTypeNotAllowed, errInstantiateXExplicitly,
     errOnlyACallOpCanBeDelegator, errUsingNoSymbol,
     errMacroBodyDependsOnGenericTypes,
     errDestructorNotGenericEnough,
@@ -114,17 +111,19 @@ type
     warnOctalEscape, warnXIsNeverRead, warnXmightNotBeenInit, 
     warnDeprecated, warnConfigDeprecated,
     warnSmallLshouldNotBeUsed, warnUnknownMagic, warnRedefinitionOfLabel, 
-    warnUnknownSubstitutionX, warnLanguageXNotSupported, warnCommentXIgnored, 
-    warnNilStatement, warnAnalysisLoophole,
+    warnUnknownSubstitutionX, warnLanguageXNotSupported,
+    warnFieldXNotSupported, warnCommentXIgnored, 
+    warnNilStatement, warnTypelessParam,
     warnDifferentHeaps, warnWriteToForeignHeap, warnUnsafeCode,
     warnEachIdentIsTuple, warnShadowIdent, 
     warnProveInit, warnProveField, warnProveIndex, warnGcUnsafe, warnGcUnsafe2,
-    warnUninit, warnGcMem, warnUser,
+    warnUninit, warnGcMem, warnDestructor, warnLockLevel, warnResultShadowed,
+    warnUser,
     hintSuccess, hintSuccessX,
     hintLineTooLong, hintXDeclaredButNotUsed, hintConvToBaseNotNeeded,
     hintConvFromXtoItselfNotNeeded, hintExprAlwaysX, hintQuitCalled,
     hintProcessing, hintCodeBegin, hintCodeEnd, hintConf, hintPath,
-    hintConditionAlwaysTrue, hintPattern,
+    hintConditionAlwaysTrue, hintName, hintPattern,
     hintUser
 
 const 
@@ -281,7 +280,7 @@ const
     errOptionExpected: "option expected, but found \'$1\'",
     errXisNoLabel: "\'$1\' is not a label", 
     errNotAllCasesCovered: "not all cases are covered", 
-    errUnkownSubstitionVar: "unknown substitution variable: \'$1\'", 
+    errUnknownSubstitionVar: "unknown substitution variable: \'$1\'", 
     errComplexStmtRequiresInd: "complex statement requires indentation",
     errXisNotCallable: "\'$1\' is not callable", 
     errNoPragmasAllowedForX: "no pragmas allowed for $1", 
@@ -313,7 +312,7 @@ const
     errXOnlyAtModuleScope: "\'$1\' is only allowed at top level", 
     errXNeedsParamObjectType: "'$1' needs a parameter that has an object type",
     errTemplateInstantiationTooNested: "template/macro instantiation too nested",
-    errInstantiationFrom: "instantiation from here", 
+    errInstantiationFrom: "template/generic instantiation from here", 
     errInvalidIndexValueForTuple: "invalid index value for tuple subscript", 
     errCommandExpectsFilename: "command expects a filename argument",
     errMainModuleMustBeSpecified: "please, specify a main module in the project configuration file",
@@ -327,12 +326,12 @@ const
     errXisNoValidIndexFile: "\'$1\' is no valid index file", 
     errCannotRenderX: "cannot render reStructuredText element \'$1\'", 
     errVarVarTypeNotAllowed: "type \'var var\' is not allowed",
-    errInstantiateXExplicitely: "instantiate '$1' explicitely",
+    errInstantiateXExplicitly: "instantiate '$1' explicitly",
     errOnlyACallOpCanBeDelegator: "only a call operator can be a delegator",
     errUsingNoSymbol: "'$1' is not a variable, constant or a proc name",
     errMacroBodyDependsOnGenericTypes: "the macro body cannot be compiled, " &
                                        "because the parameter '$1' has a generic type",
-    errDestructorNotGenericEnough: "Destructor signarue is too specific. " &
+    errDestructorNotGenericEnough: "Destructor signature is too specific. " &
                                    "A destructor must be associated will all instantiations of a generic type",
     errInlineIteratorsAsProcParams: "inline iterators can be used as parameters only for " &
                                     "templates, macros and other inline iterators",
@@ -361,23 +360,24 @@ const
     errCannotInferReturnType: "cannot infer the return type of the proc",
     errGenericLambdaNotAllowed: "A nested proc can have generic parameters only when " &
                                 "it is used as an operand to another routine and the types " &
-                                "of the generic paramers can be infered from the expected signature.",
+                                "of the generic paramers can be inferred from the expected signature.",
     errCompilerDoesntSupportTarget: "The current compiler \'$1\' doesn't support the requested compilation target",
     errUser: "$1", 
     warnCannotOpenFile: "cannot open \'$1\' [CannotOpenFile]",
     warnOctalEscape: "octal escape sequences do not exist; leading zero is ignored [OctalEscape]", 
     warnXIsNeverRead: "\'$1\' is never read [XIsNeverRead]", 
     warnXmightNotBeenInit: "\'$1\' might not have been initialized [XmightNotBeenInit]", 
-    warnDeprecated: "\'$1\' is deprecated [Deprecated]", 
+    warnDeprecated: "$1 is deprecated [Deprecated]", 
     warnConfigDeprecated: "config file '$1' is deprecated [ConfigDeprecated]",
     warnSmallLshouldNotBeUsed: "\'l\' should not be used as an identifier; may look like \'1\' (one) [SmallLshouldNotBeUsed]", 
     warnUnknownMagic: "unknown magic \'$1\' might crash the compiler [UnknownMagic]", 
     warnRedefinitionOfLabel: "redefinition of label \'$1\' [RedefinitionOfLabel]", 
     warnUnknownSubstitutionX: "unknown substitution \'$1\' [UnknownSubstitutionX]", 
     warnLanguageXNotSupported: "language \'$1\' not supported [LanguageXNotSupported]", 
+    warnFieldXNotSupported: "field \'$1\' not supported [FieldXNotSupported]", 
     warnCommentXIgnored: "comment \'$1\' ignored [CommentXIgnored]", 
     warnNilStatement: "'nil' statement is deprecated; use an empty 'discard' statement instead [NilStmt]", 
-    warnAnalysisLoophole: "thread analysis incomplete due to unknown call '$1' [AnalysisLoophole]",
+    warnTypelessParam: "'$1' has no type. Typeless parameters are deprecated; only allowed for 'template' [TypelessParam]",
     warnDifferentHeaps: "possible inconsistency of thread local heaps [DifferentHeaps]",
     warnWriteToForeignHeap: "write to foreign heap [WriteToForeignHeap]",
     warnUnsafeCode: "unsafe code: '$1' [UnsafeCode]",
@@ -387,9 +387,12 @@ const
     warnProveField: "cannot prove that field '$1' is accessible [ProveField]",
     warnProveIndex: "cannot prove index '$1' is valid [ProveIndex]",
     warnGcUnsafe: "not GC-safe: '$1' [GcUnsafe]",
-    warnGcUnsafe2: "cannot prove '$1' is GC-safe. This will become a compile time error in the future.",
+    warnGcUnsafe2: "cannot prove '$1' is GC-safe. Does not compile with --threads:on.",
     warnUninit: "'$1' might not have been initialized [Uninit]",
     warnGcMem: "'$1' uses GC'ed memory [GcMem]",
+    warnDestructor: "usage of a type with a destructor in a non destructible context. This will become a compile time error in the future. [Destructor]",
+    warnLockLevel: "$1 [LockLevel]",
+    warnResultShadowed: "Special variable 'result' is shadowed. [ResultShadowed]",
     warnUser: "$1 [User]", 
     hintSuccess: "operation successful [Success]", 
     hintSuccessX: "operation successful ($# lines compiled; $# sec total; $#) [SuccessX]", 
@@ -405,25 +408,27 @@ const
     hintConf: "used config file \'$1\' [Conf]", 
     hintPath: "added path: '$1' [Path]",
     hintConditionAlwaysTrue: "condition is always true: '$1' [CondTrue]",
+    hintName: "name should be: '$1' [Name]",
     hintPattern: "$1 [Pattern]",
     hintUser: "$1 [User]"]
 
 const
-  WarningsToStr*: array[0..26, string] = ["CannotOpenFile", "OctalEscape", 
+  WarningsToStr*: array[0..30, string] = ["CannotOpenFile", "OctalEscape", 
     "XIsNeverRead", "XmightNotBeenInit",
     "Deprecated", "ConfigDeprecated",
     "SmallLshouldNotBeUsed", "UnknownMagic", 
-    "RedefinitionOfLabel", "UnknownSubstitutionX", "LanguageXNotSupported", 
+    "RedefinitionOfLabel", "UnknownSubstitutionX",
+    "LanguageXNotSupported", "FieldXNotSupported",
     "CommentXIgnored", "NilStmt",
-    "AnalysisLoophole", "DifferentHeaps", "WriteToForeignHeap",
+    "TypelessParam", "DifferentHeaps", "WriteToForeignHeap",
     "UnsafeCode", "EachIdentIsTuple", "ShadowIdent", 
     "ProveInit", "ProveField", "ProveIndex", "GcUnsafe", "GcUnsafe2", "Uninit",
-    "GcMem", "User"]
+    "GcMem", "Destructor", "LockLevel", "ResultShadowed", "User"]
 
-  HintsToStr*: array[0..15, string] = ["Success", "SuccessX", "LineTooLong", 
+  HintsToStr*: array[0..16, string] = ["Success", "SuccessX", "LineTooLong", 
     "XDeclaredButNotUsed", "ConvToBaseNotNeeded", "ConvFromXtoItselfNotNeeded", 
     "ExprAlwaysX", "QuitCalled", "Processing", "CodeBegin", "CodeEnd", "Conf", 
-    "Path", "CondTrue", "Pattern",
+    "Path", "CondTrue", "Name", "Pattern",
     "User"]
 
 const 
@@ -440,21 +445,24 @@ type
   TNoteKind* = range[warnMin..hintMax] # "notes" are warnings or hints
   TNoteKinds* = set[TNoteKind]
 
-  TFileInfo*{.final.} = object 
-    fullPath*: string          # This is a canonical full filesystem path
+  TFileInfo* = object 
+    fullPath: string           # This is a canonical full filesystem path
     projPath*: string          # This is relative to the project's root
     shortName*: string         # short name of the module
     quotedName*: PRope         # cached quoted short name for codegen
-                               # purpoes
+                               # purposes
     
     lines*: seq[PRope]         # the source code of the module
                                #   used for better error messages and
                                #   embedding the original source in the
                                #   generated code
+    dirtyfile: string          # the file that is actually read into memory
+                               # and parsed; usually 'nil' but is used
+                               # for 'nimsuggest'
 
-  TLineInfo*{.final.} = object # This is designed to be as small as possible,
+  TLineInfo* = object          # This is designed to be as small as possible,
                                # because it is used
-                               # in syntax nodes. We safe space here by using 
+                               # in syntax nodes. We save space here by using 
                                # two int16 and an int32.
                                # On 64 bit and on 32 bit systems this is 
                                # only 8 bytes.
@@ -468,8 +476,8 @@ type
 
   TErrorOutputs* = set[TErrorOutput]
 
-  ERecoverableError* = object of EInvalidValue
-  ESuggestDone* = object of E_Base
+  ERecoverableError* = object of ValueError
+  ESuggestDone* = object of Exception
 
 const
   InvalidFileIDX* = int32(-1)
@@ -487,7 +495,7 @@ proc toCChar*(c: char): string =
 
 proc makeCString*(s: string): PRope =
   # BUGFIX: We have to split long strings into many ropes. Otherwise
-  # this could trigger an InternalError(). See the ropes module for
+  # this could trigger an internalError(). See the ropes module for
   # further information.
   const 
     MaxLineLength = 64
@@ -516,7 +524,7 @@ proc newFileInfo(fullPath, projPath: string): TFileInfo =
   if optEmbedOrigSrc in gGlobalOptions or true:
     result.lines = @[]
 
-proc fileInfoIdx*(filename: string): int32 =
+proc fileInfoIdx*(filename: string; isKnownFile: var bool): int32 =
   var
     canon: string
     pseudoPath = false
@@ -533,10 +541,15 @@ proc fileInfoIdx*(filename: string): int32 =
   if filenameToIndexTbl.hasKey(canon):
     result = filenameToIndexTbl[canon]
   else:
+    isKnownFile = false
     result = fileInfos.len.int32
     fileInfos.add(newFileInfo(canon, if pseudoPath: filename
                                      else: canon.shortenDir))
     filenameToIndexTbl[canon] = result
+
+proc fileInfoIdx*(filename: string): int32 =
+  var dummy: bool
+  result = fileInfoIdx(filename, dummy)
 
 proc newLineInfo*(fileInfoIdx: int32, line, col: int): TLineInfo =
   result.fileIndex = fileInfoIdx
@@ -566,9 +579,6 @@ var
   gWarnCounter*: int = 0
   gErrorMax*: int = 1         # stop after gErrorMax errors
 
-when useCaas:
-  var stdoutSocket*: TSocket
-
 proc unknownLineInfo*(): TLineInfo =
   result.line = int16(-1)
   result.col = int16(-1)
@@ -580,32 +590,24 @@ var
   bufferedMsgs*: seq[string]
 
   errorOutputs* = {eStdOut, eStdErr}
+  writelnHook*: proc (output: string) {.closure.}
 
 proc clearBufferedMsgs* =
   bufferedMsgs = nil
 
 proc suggestWriteln*(s: string) =
   if eStdOut in errorOutputs:
-    when useCaas:
-      if isNil(stdoutSocket): writeln(stdout, s)
-      else:
-        writeln(stdout, s)
-        stdoutSocket.send(s & "\c\L")
-    else:
-      writeln(stdout, s)
+    if isNil(writelnHook): writeln(stdout, s)
+    else: writelnHook(s)
   
   if eInMemory in errorOutputs:
     bufferedMsgs.safeAdd(s)
 
+proc msgQuit*(x: int8) = quit x
+proc msgQuit*(x: string) = quit x
+
 proc suggestQuit*() =
-  if not isServing:
-    quit(0)
-  elif isWorkingWithDirtyBuffer:
-    # No need to compile the rest if we are working with a
-    # throw-away buffer. Incomplete dot expressions frequently
-    # found in dirty buffers will result in errors few steps
-    # from now anyway.
-    raise newException(ESuggestDone, "suggest done")
+  raise newException(ESuggestDone, "suggest done")
 
 # this format is understood by many text editors: it is the same that
 # Borland and Freepascal use
@@ -641,6 +643,18 @@ proc toFullPath*(fileIdx: int32): string =
   if fileIdx < 0: result = "???"
   else: result = fileInfos[fileIdx].fullPath
 
+proc setDirtyFile*(fileIdx: int32; filename: string) =
+  assert fileIdx >= 0
+  fileInfos[fileIdx].dirtyFile = filename
+
+proc toFullPathConsiderDirty*(fileIdx: int32): string =
+  if fileIdx < 0:
+    result = "???"
+  elif not fileInfos[fileIdx].dirtyFile.isNil:
+    result = fileInfos[fileIdx].dirtyFile
+  else:
+    result = fileInfos[fileIdx].fullPath
+
 template toFilename*(info: TLineInfo): string =
   info.fileIndex.toFilename
 
@@ -648,12 +662,12 @@ template toFullPath*(info: TLineInfo): string =
   info.fileIndex.toFullPath
 
 proc toMsgFilename*(info: TLineInfo): string =
-  if info.fileIndex < 0: result = "???"
+  if info.fileIndex < 0:
+    result = "???"
+  elif gListFullPaths:
+    result = fileInfos[info.fileIndex].fullPath
   else:
-    if gListFullPaths:
-      result = fileInfos[info.fileIndex].fullPath
-    else:
-      result = fileInfos[info.fileIndex].projPath
+    result = fileInfos[info.fileIndex].projPath
 
 proc toLinenumber*(info: TLineInfo): int {.inline.} = 
   result = info.line
@@ -667,20 +681,13 @@ proc toFileLine*(info: TLineInfo): string {.inline.} =
 proc toFileLineCol*(info: TLineInfo): string {.inline.} =
   result = info.toFilename & "(" & $info.line & "," & $info.col & ")"
 
-template `$`*(info: TLineInfo): expr = toFileLineCol(info)
+proc `$`*(info: TLineInfo): string = toFileLineCol(info)
 
 proc `??`* (info: TLineInfo, filename: string): bool =
   # only for debugging purposes
   result = filename in info.toFilename
 
-var checkPoints*: seq[TLineInfo] = @[]
-var optTrackPos*: TLineInfo
-
-proc addCheckpoint*(info: TLineInfo) = 
-  checkPoints.add(info)
-
-proc addCheckpoint*(filename: string, line: int) = 
-  addCheckpoint(newLineInfo(filename, line, - 1))
+var gTrackPos*: TLineInfo
 
 proc outWriteln*(s: string) = 
   ## Writes to stdout. Always.
@@ -688,9 +695,12 @@ proc outWriteln*(s: string) =
  
 proc msgWriteln*(s: string) = 
   ## Writes to stdout. If --stdout option is given, writes to stderr instead.
-  if gCmd == cmdIdeTools and optCDebug notin gGlobalOptions: return
 
-  if optStdout in gGlobalOptions:
+  #if gCmd == cmdIdeTools and optCDebug notin gGlobalOptions: return
+
+  if not isNil(writelnHook):
+    writelnHook(s)
+  elif optStdout in gGlobalOptions:
     if eStdErr in errorOutputs: writeln(stderr, s)
   else:
     if eStdOut in errorOutputs: writeln(stdout, s)
@@ -709,25 +719,15 @@ proc getMessageStr(msg: TMsgKind, arg: string): string =
   result = msgKindToString(msg) % [arg]
 
 type
-  TCheckPointResult* = enum 
-    cpNone, cpFuzzy, cpExact
-
-proc inCheckpoint*(current: TLineInfo): TCheckPointResult = 
-  for i in countup(0, high(checkPoints)): 
-    if current.fileIndex == checkPoints[i].fileIndex:
-      if current.line == checkPoints[i].line and
-          abs(current.col-checkPoints[i].col) < 4:
-        return cpExact
-      if current.line >= checkPoints[i].line:
-        return cpFuzzy
-
-type
   TErrorHandling = enum doNothing, doAbort, doRaise
 
 proc handleError(msg: TMsgKind, eh: TErrorHandling, s: string) =
   template quit =
     if defined(debug) or gVerbosity >= 3 or msg == errInternal:
-      writeStackTrace()
+      if stackTraceAvailable() and isNil(writelnHook):
+        writeStackTrace()
+      else:
+        msgWriteln("No stack traceback available\nTo create a stacktrace, rerun compilation with ./koch temp " & options.command & " <file>")
     quit 1
 
   if msg >= fatalMin and msg <= fatalMax:
@@ -755,6 +755,9 @@ proc writeContext(lastinfo: TLineInfo) =
                                      getMessageStr(errInstantiationFrom, "")])
     info = msgContext[i]
 
+proc ignoreMsgBecauseOfIdeTools(msg: TMsgKind): bool =
+  msg >= errGenerated and gCmd == cmdIdeTools and optIdeDebug notin gGlobalOptions
+
 proc rawMessage*(msg: TMsgKind, args: openArray[string]) = 
   var frmt: string
   case msg
@@ -773,7 +776,8 @@ proc rawMessage*(msg: TMsgKind, args: openArray[string]) =
     frmt = RawHintFormat
     inc(gHintCounter)
   let s = `%`(frmt, `%`(msgKindToString(msg), args))
-  msgWriteln(s)
+  if not ignoreMsgBecauseOfIdeTools(msg):
+    msgWriteln(s)
   handleError(msg, doAbort, s)
 
 proc rawMessage*(msg: TMsgKind, arg: string) = 
@@ -782,7 +786,15 @@ proc rawMessage*(msg: TMsgKind, arg: string) =
 proc writeSurroundingSrc(info: TLineInfo) =
   const indent = "  "
   msgWriteln(indent & info.sourceLine.ropeToStr)
-  msgWriteln(indent & repeatChar(info.col, ' ') & '^')
+  msgWriteln(indent & spaces(info.col) & '^')
+
+proc formatMsg*(info: TLineInfo, msg: TMsgKind, arg: string): string =
+  let frmt = case msg
+             of warnMin..warnMax: PosWarningFormat
+             of hintMin..hintMax: PosHintFormat
+             else: PosErrorFormat
+  result = frmt % [toMsgFilename(info), coordToStr(info.line),
+                   coordToStr(info.col), getMessageStr(msg, arg)]
 
 proc liMessage(info: TLineInfo, msg: TMsgKind, arg: string, 
                eh: TErrorHandling) =
@@ -807,7 +819,7 @@ proc liMessage(info: TLineInfo, msg: TMsgKind, arg: string,
     inc(gHintCounter)
   let s = frmt % [toMsgFilename(info), coordToStr(info.line),
                   coordToStr(info.col), getMessageStr(msg, arg)]
-  if not ignoreMsg:
+  if not ignoreMsg and not ignoreMsgBecauseOfIdeTools(msg):
     msgWriteln(s)
     if optPrintSurroundingSrc and msg in errMin..errMax:
       info.writeSurroundingSrc
@@ -858,7 +870,7 @@ proc sourceLine*(i: TLineInfo): PRope =
     try:
       for line in lines(i.toFullPath):
         addSourceLine i.fileIndex, line.string
-    except EIO:
+    except IOError:
       discard
   internalAssert i.fileIndex < fileInfos.len
   # can happen if the error points to EOF:

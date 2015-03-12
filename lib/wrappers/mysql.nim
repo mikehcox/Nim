@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2010 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -10,11 +10,15 @@
 {.deadCodeElim: on.}
 {.push, callconv: cdecl.}
 
-when defined(Unix): 
-  const 
-    lib = "libmysqlclient.so.15"
-when defined(Windows): 
-  const 
+when defined(Unix):
+  when defined(macosx):
+    const
+      lib = "libmysqlclient.(15|16|17|18).dylib"
+  else:
+    const
+      lib = "libmysqlclient.so.(15|16|17|18)"
+when defined(Windows):
+  const
     lib = "libmysql.dll"
 type 
   my_bool* = bool
@@ -59,9 +63,9 @@ type
 const 
   SCRAMBLE_LENGTH* = 20 # Length of random string sent by server on handshake; 
                         # this is also length of obfuscated password, 
-                        # recieved from client
+                        # received from client
   SCRAMBLE_LENGTH_323* = 8    # length of password stored in the db: 
-                              # new passwords are preceeded with '*'  
+                              # new passwords are preceded with '*'  
   SCRAMBLED_PASSWORD_CHAR_LENGTH* = SCRAMBLE_LENGTH * 2 + 1
   SCRAMBLED_PASSWORD_CHAR_LENGTH_323* = SCRAMBLE_LENGTH_323 * 2
   NOT_NULL_FLAG* = 1          #  Field can't be NULL
@@ -142,7 +146,7 @@ const
   MAX_MEDIUMINT_WIDTH* = 8    # Max width for a INT24 w.o. sign
   MAX_INT_WIDTH* = 10         # Max width for a LONG w.o. sign
   MAX_BIGINT_WIDTH* = 20      # Max width for a LONGLONG
-  MAX_CHAR_WIDTH* = 255       # Max length for a CHAR colum
+  MAX_CHAR_WIDTH* = 255       # Max length for a CHAR column
   MAX_BLOB_WIDTH* = 8192      # Default width for blob
 
 type 
@@ -554,7 +558,7 @@ type
   Tstatus* = enum 
     STATUS_READY, STATUS_GET_RESULT, STATUS_USE_RESULT
   Tprotocol_type* = enum  # There are three types of queries - the ones that have to go to
-                          # the master, the ones that go to a slave, and the adminstrative
+                          # the master, the ones that go to a slave, and the administrative
                           # type which must happen on the pivot connectioin 
     PROTOCOL_DEFAULT, PROTOCOL_TCP, PROTOCOL_SOCKET, PROTOCOL_PIPE, 
     PROTOCOL_MEMORY
@@ -729,7 +733,7 @@ type
     len*: int                 # output length pointer
     is_null*: Pmy_bool        # Pointer to null indicator
     buffer*: pointer          # buffer to get/put data
-    error*: pmy_bool          # set this if you want to track data truncations happened during fetch
+    error*: PMy_bool          # set this if you want to track data truncations happened during fetch
     buffer_type*: Tenum_field_types # buffer type
     buffer_length*: int       # buffer length, must be set for str/binary
                               # Following are for internal use. Set by mysql_stmt_bind_param  
@@ -786,7 +790,7 @@ proc server_init*(argc: cint, argv: cstringArray, groups: cstringArray): cint{.
 proc server_end*(){.cdecl, dynlib: lib, importc: "mysql_server_end".}
   # mysql_server_init/end need to be called when using libmysqld or
   #      libmysqlclient (exactly, mysql_server_init() is called by mysql_init() so
-  #      you don't need to call it explicitely; but you need to call
+  #      you don't need to call it explicitly; but you need to call
   #      mysql_server_end() to free memory). The names are a bit misleading
   #      (mysql_SERVER* to be used when using libmysqlCLIENT). So we add more general
   #      names which suit well whether you're using libmysqld or libmysqlclient. We
@@ -904,7 +908,7 @@ proc shutdown*(MySQL: PMySQL, shutdown_level: Tenum_shutdown_level): cint{.stdca
     dynlib: lib, importc: "mysql_shutdown".}
 proc dump_debug_info*(MySQL: PMySQL): cint{.stdcall, dynlib: lib, 
                                   importc: "mysql_dump_debug_info".}
-proc refresh*(MySQL: PMySQL, refresh_options: cuint): cint{.stdcall, dynlib: lib, 
+proc refresh*(sql: PMySQL, refresh_options: cuint): cint{.stdcall, dynlib: lib, 
     importc: "mysql_refresh".}
 proc kill*(MySQL: PMySQL, pid: int): cint{.stdcall, dynlib: lib, importc: "mysql_kill".}
 proc set_server_option*(MySQL: PMySQL, option: Tenum_mysql_set_option): cint{.stdcall, 
@@ -1040,7 +1044,7 @@ const
   NO_DATA* = 100
   DATA_TRUNCATED* = 101
 
-proc reload*(MySQL: PMySQL): cint
+proc reload*(x: PMySQL): cint
 when defined(USE_OLD_FUNCTIONS): 
   proc connect*(MySQL: PMySQL, host: cstring, user: cstring, passwd: cstring): PMySQL{.stdcall, 
       dynlib: lib, importc: "mysql_connect".}
@@ -1059,7 +1063,7 @@ proc IS_NOT_NULL(n: int32): bool =
 proc IS_BLOB(n: int32): bool = 
   result = (n and BLOB_FLAG) != 0
 
-proc IS_NUM_FIELD(f: pst_mysql_field): bool = 
+proc IS_NUM_FIELD(f: Pst_mysql_field): bool = 
   result = (f.flags and NUM_FLAG) != 0
 
 proc IS_NUM(t: Tenum_field_types): bool = 
@@ -1071,7 +1075,7 @@ proc INTERNAL_NUM_FIELD(f: Pst_mysql_field): bool =
       ((f.ftype != FIELD_TYPE_TIMESTAMP) or (f.len == 14) or (f.len == 8)) or
       (f.ftype == FIELD_TYPE_YEAR)
 
-proc reload(mysql: PMySQL): cint = 
-  result = refresh(mysql, REFRESH_GRANT)
+proc reload(x: PMySQL): cint =
+  result = refresh(x, REFRESH_GRANT)
 
 {.pop.}

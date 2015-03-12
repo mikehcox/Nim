@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -27,9 +27,9 @@ when defined(windows):
   proc `-`(a, b: TTicks): TNanos =
     var frequency: int64
     QueryPerformanceFrequency(frequency)
-    var performanceCounterRate = 1000000000.0 / toFloat(frequency.int)
+    var performanceCounterRate = 1e+9'f64 / float64(frequency)
 
-    result = ((a.int64 - b.int64).int.toFloat * performanceCounterRate).TNanos
+    result = TNanos(float64(a.int64 - b.int64) * performanceCounterRate)
 
 elif defined(macosx):
   type

@@ -1,7 +1,7 @@
 #
 #
-#           The Nimrod Compiler
-#        (c) Copyright 2014 Andreas Rumpf
+#           The Nim Compiler
+#        (c) Copyright 2015 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
 #    distribution, for details about the copyright.
@@ -14,7 +14,7 @@ import
 
 # We need to use a PStringTable here as defined symbols are always guaranteed
 # to be style insensitive. Otherwise hell would break lose.
-var gSymbols: PStringTable
+var gSymbols: StringTableRef
 
 proc defineSymbol*(symbol: string) = 
   gSymbols[symbol] = "true"
@@ -41,12 +41,12 @@ proc countDefinedSymbols*(): int =
   for key, val in pairs(gSymbols):
     if val == "true": inc(result)
 
-# For ease of bootstrapping, we keep there here and not in the global config
+# For ease of bootstrapping, we keep them here and not in the global config
 # file for now:
 const
   additionalSymbols = """
     x86 itanium x8664
-    msdos mswindows win32 unix posix sunos bsd macintosh RISCOS doslike hpux
+    msdos mswindows win32 unix posix sunos bsd macintosh RISCOS hpux
     mac
 
     hppa hp9000 hp9000s300 hp9000s700 hp9000s800 hp9000s820 ELATE sparcv9
@@ -60,7 +60,7 @@ const
     quick
     release debug
     useWinAnsi useFork useNimRtl useMalloc useRealtimeGC ssl memProfiler
-    nodejs kwin
+    nodejs kwin nimfix
 
     usesysassert usegcassert tinyC useFFI
     useStdoutAsStdmsg createNimRtl
@@ -69,6 +69,8 @@ const
     reportMissedDeadlines avoidTimeMachine useClone ignoreAllocationSize
     debugExecProcesses pcreDll useLipzipSrc
     preventDeadlocks UNICODE winUnicode trackGcHeaders posixRealtime
+
+    nimStdSetjmp nimRawSetjmp nimSigSetjmp
   """.split
 
 proc initDefines*() = 
@@ -85,6 +87,9 @@ proc initDefines*() =
   defineSymbol("nimnewshared")
   defineSymbol("nimrequiresnimframe")
   defineSymbol("nimparsebiggestfloatmagic")
+  defineSymbol("nimalias")
+  defineSymbol("nimlocks")
+  defineSymbol("nimnode")
   
   # add platform specific symbols:
   for c in low(CPU)..high(CPU):
@@ -110,7 +115,7 @@ proc initDefines*() =
     defineSymbol("mswindows")
     defineSymbol("win32")
   of osLinux, osMorphos, osSkyos, osIrix, osPalmos, osQnx, osAtari, osAix, 
-     osHaiku:
+     osHaiku, osVxWorks:
     # these are all 'unix-like'
     defineSymbol("unix")
     defineSymbol("posix")
@@ -136,3 +141,7 @@ proc initDefines*() =
   declareSymbol("emulatedthreadvars")
   if platform.OS[targetOS].props.contains(ospLacksThreadVars):
     defineSymbol("emulatedthreadvars")
+  case targetOS
+  of osSolaris, osNetbsd, osFreebsd, osOpenbsd, osMacosx:
+    defineSymbol("nimRawSetjmp")
+  else: discard

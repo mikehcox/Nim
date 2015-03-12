@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -10,13 +10,16 @@
 ## This module implements some common generic algorithms.
 
 type
-  TSortOrder* = enum   ## sort order
-    Descending, Ascending 
+  SortOrder* = enum   ## sort order
+    Descending, Ascending
 
-proc `*`*(x: int, order: TSortOrder): int {.inline.} = 
+{.deprecated: [TSortOrder: SortOrder].}
+
+
+proc `*`*(x: int, order: SortOrder): int {.inline.} =
   ## flips `x` if ``order == Descending``;
   ## if ``order == Ascending`` then `x` is returned.
-  ## `x` is supposed to be the result of a comparator, ie ``< 0`` for 
+  ## `x` is supposed to be the result of a comparator, ie ``< 0`` for
   ## *less than*, ``== 0`` for *equal*, ``> 0`` for *greater than*.
   var y = order.ord - 1
   result = (x xor y) - y
@@ -69,15 +72,16 @@ proc smartBinarySearch*[T](a: openArray[T], key: T): int =
 const
   onlySafeCode = true
 
-proc lowerBound*[T](a: openarray[T], key: T, cmp: proc(x,y: T): int {.closure.}): int =
-  ## same as binarySearch except that if key is not in `a` then this 
+proc lowerBound*[T](a: openArray[T], key: T, cmp: proc(x,y: T): int {.closure.}): int =
+  ## same as binarySearch except that if key is not in `a` then this
   ## returns the location where `key` would be if it were. In other
-  ## words if you have a sorted sequence and you call insert(thing, elm, lowerBound(thing, elm))
-  ## the sequence will still be sorted
+  ## words if you have a sorted sequence and you call
+  ## insert(thing, elm, lowerBound(thing, elm))
+  ## the sequence will still be sorted.
   ##
-  ## `cmp` is the comparator function to use, the expected return values are the same as
-  ## that of system.cmp
-  ## 
+  ## `cmp` is the comparator function to use, the expected return values are
+  ## the same as that of system.cmp.
+  ##
   ## example::
   ##
   ##   var arr = @[1,2,3,5,6,7,8,9]
@@ -98,10 +102,10 @@ proc lowerBound*[T](a: openarray[T], key: T, cmp: proc(x,y: T): int {.closure.})
     else:
       count = step
 
-proc lowerBound*[T](a: openarray[T], key: T): int = lowerBound(a, key, cmp[T])
-proc merge[T](a, b: var openArray[T], lo, m, hi: int, 
-              cmp: proc (x, y: T): int {.closure.}, order: TSortOrder) =
-  template `<-` (a, b: expr) = 
+proc lowerBound*[T](a: openArray[T], key: T): int = lowerBound(a, key, cmp[T])
+proc merge[T](a, b: var openArray[T], lo, m, hi: int,
+              cmp: proc (x, y: T): int {.closure.}, order: SortOrder) =
+  template `<-` (a, b: expr) =
     when false:
       a = b
     elif onlySafeCode:
@@ -147,16 +151,16 @@ proc merge[T](a, b: var openArray[T], lo, m, hi: int,
 
 proc sort*[T](a: var openArray[T],
               cmp: proc (x, y: T): int {.closure.},
-              order = TSortOrder.Ascending) =
-  ## Default Nimrod sort. The sorting is guaranteed to be stable and 
+              order = SortOrder.Ascending) =
+  ## Default Nim sort. The sorting is guaranteed to be stable and
   ## the worst case is guaranteed to be O(n log n).
   ## The current implementation uses an iterative
-  ## mergesort to achieve this. It uses a temporary sequence of 
-  ## length ``a.len div 2``. Currently Nimrod does not support a
+  ## mergesort to achieve this. It uses a temporary sequence of
+  ## length ``a.len div 2``. Currently Nim does not support a
   ## sensible default argument for ``cmp``, so you have to provide one
   ## of your own. However, the ``system.cmp`` procs can be used:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block:: nim
   ##
   ##    sort(myIntArray, system.cmp[int])
   ##
@@ -167,7 +171,7 @@ proc sort*[T](a: var openArray[T],
   ## You can inline adhoc comparison procs with the `do notation
   ## <manual.html#do-notation>`_. Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block:: nim
   ##
   ##   people.sort do (x, y: Person) -> int:
   ##     result = cmp(x.surname, y.surname)
@@ -184,7 +188,49 @@ proc sort*[T](a: var openArray[T],
       dec(m, s*2)
     s = s*2
 
-proc product*[T](x: openarray[seq[T]]): seq[seq[T]] =
+proc sorted*[T](a: openArray[T], cmp: proc(x, y: T): int {.closure.},
+                order = SortOrder.Ascending): seq[T] =
+  ## returns `a` sorted by `cmp` in the specified `order`.
+  result = newSeq[T](a.len)
+  for i in 0 .. a.high:
+    result[i] = a[i]
+  sort(result, cmp, order)
+
+template sortedByIt*(seq1, op: expr): expr =
+  ## Convenience template around the ``sorted`` proc to reduce typing.
+  ##
+  ## The template injects the ``it`` variable which you can use directly in an
+  ## expression. Example:
+  ##
+  ## .. code-block:: nim
+  ##
+  ##   type Person = tuple[name: string, age: int]
+  ##   var
+  ##     p1: Person = (name: "p1", age: 60)
+  ##     p2: Person = (name: "p2", age: 20)
+  ##     p3: Person = (name: "p3", age: 30)
+  ##     p4: Person = (name: "p4", age: 30)
+  ##
+  ##   people = @[p1,p2,p4,p3]
+  ##
+  ##   echo people.sortedByIt(it.name)
+  ##
+  ## Because the underlying ``cmp()`` is defined for tuples you can do
+  ## a nested sort like in the following example:
+  ##
+  ## .. code-block:: nim
+  ##
+  ##   echo people.sortedByIt((it.age, it.name))
+  ##
+  var result {.gensym.} = sorted(seq1, proc(x, y: type(seq1[0])): int =
+    var it {.inject.} = x
+    let a = op
+    it = y
+    let b = op
+    result = cmp(a, b))
+  result
+
+proc product*[T](x: openArray[seq[T]]): seq[seq[T]] =
   ## produces the Cartesian product of the array. Warning: complexity
   ## may explode.
   result = @[]
@@ -217,3 +263,62 @@ proc product*[T](x: openarray[seq[T]]): seq[seq[T]] =
     result.add(res)
     index = 0
     indexes[index] -=1
+
+proc nextPermutation*[T](x: var openarray[T]): bool {.discardable.} =
+  ## Calculates the next lexicographic permutation, directly modifying ``x``.
+  ## The result is whether a permutation happened, otherwise we have reached
+  ## the last-ordered permutation.
+  ##
+  ## .. code-block:: nim
+  ##
+  ##     var v = @[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  ##     v.nextPermutation()
+  ##     echo v
+  if x.len < 2:
+    return false
+
+  var i = x.high
+  while i > 0 and x[i-1] >= x[i]:
+    dec i
+
+  if i == 0:
+    return false
+
+  var j = x.high
+  while j >= i and x[j] <= x[i-1]:
+    dec j
+
+  swap x[j], x[i-1]
+  x.reverse(i, x.high)
+
+  result = true
+
+proc prevPermutation*[T](x: var openarray[T]): bool {.discardable.} =
+  ## Calculates the previous lexicographic permutation, directly modifying
+  ## ``x``.  The result is whether a permutation happened, otherwise we have
+  ## reached the first-ordered permutation.
+  ##
+  ## .. code-block:: nim
+  ##
+  ##     var v = @[0, 1, 2, 3, 4, 5, 6, 7, 9, 8]
+  ##     v.prevPermutation()
+  ##     echo v
+  if x.len < 2:
+    return false
+
+  var i = x.high
+  while i > 0 and x[i-1] <= x[i]:
+    dec i
+
+  if i == 0:
+    return false
+
+  x.reverse(i, x.high)
+
+  var j = x.high
+  while j >= i and x[j-1] < x[i-1]:
+    dec j
+
+  swap x[i-1], x[j]
+
+  result = true

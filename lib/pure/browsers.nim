@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -42,7 +42,7 @@ proc openDefaultBrowser*(url: string) =
     for b in getEnv("BROWSER").string.split(PathSep):
       try:
         # we use ``startProcess`` here because we don't want to block!
-        discard startProcess(command=b, args=[url], options={poUseShell})
+        discard startProcess(command=b, args=[url], options={poUsePath})
         return
-      except EOS:
+      except OSError:
         discard

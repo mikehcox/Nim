@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -62,7 +62,7 @@ type
     frameLen*: int16
   
   TCProc{.final.} = object    # represents C proc that is currently generated
-    prc*: PSym                # the Nimrod proc that this C proc belongs to
+    prc*: PSym                # the Nim proc that this C proc belongs to
     beforeRetNeeded*: bool    # true iff 'BeforeRet' label for proc is needed
     threadVarAccessed*: bool  # true if the proc already accessed some threadvar
     nestedTryStmts*: seq[PNode]   # in how many nested try statements we are
@@ -82,6 +82,9 @@ type
     maxFrameLen*: int         # max length of frame descriptor
     module*: BModule          # used to prevent excessive parameter passing
     withinLoop*: int          # > 0 if we are within a loop
+    splitDecls*: int          # > 0 if we are in some context for C++ that
+                              # requires 'T x = T()' to become 'T x; x = T()'
+                              # (yes, C++ is weird like that)
     gcFrameId*: Natural       # for the GC stack marking
     gcFrameType*: PRope       # the struct {} we put the GC markers into
   
@@ -101,10 +104,10 @@ type
                               # without extension)
     typeCache*: TIdTable      # cache the generated types
     forwTypeCache*: TIdTable  # cache for forward declarations of types
-    declaredThings*: TIntSet  # things we have declared in this .c file
-    declaredProtos*: TIntSet  # prototypes we have declared in this .c file
+    declaredThings*: IntSet  # things we have declared in this .c file
+    declaredProtos*: IntSet  # prototypes we have declared in this .c file
     headerFiles*: TLinkedList # needed headers to include
-    typeInfoMarker*: TIntSet  # needed for generating type information
+    typeInfoMarker*: IntSet  # needed for generating type information
     initProc*: BProc          # code for init procedure
     postInitProc*: BProc      # code to be executed after the init proc
     preInitProc*: BProc       # code executed before the init proc

@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2013 Robert Persson
 #
 #    See the file "copying.txt", included in this
@@ -23,7 +23,7 @@ import times
 ##
 ## Quick start example:
 ##   
-##   # Create a matrix wich first rotates, then scales and at last translates
+##   # Create a matrix which first rotates, then scales and at last translates
 ##   
 ##   var m:TMatrix3d=rotate(PI,vector3d(1,1,2.5)) & scale(2.0) & move(100.0,200.0,300.0)
 ##   
@@ -220,7 +220,7 @@ proc rotate*(angle:float,axis:TVector3d):TMatrix3d {.noInit.}=
 
   var normax=axis
   if not normax.tryNormalize: #simplifies matrix computation below a lot
-    raise newException(EDivByZero,"Cannot rotate around zero length axis")
+    raise newException(DivByZeroError,"Cannot rotate around zero length axis")
 
   let
     cs=cos(angle)
@@ -251,7 +251,7 @@ proc rotate*(angle:float,org:TPoint3d,axis:TVector3d):TMatrix3d {.noInit.}=
   
   var normax=axis
   if not normax.tryNormalize: #simplifies matrix computation below a lot
-    raise newException(EDivByZero,"Cannot rotate around zero length axis")
+    raise newException(DivByZeroError,"Cannot rotate around zero length axis")
   
   let
     u=normax.x
@@ -320,7 +320,7 @@ proc rotateZ*(angle:float):TMatrix3d {.noInit.}=
     
 proc isUniform*(m:TMatrix3d,tol=1.0e-6):bool=
   ## Checks if the transform is uniform, that is 
-  ## perpendicular axes of equal lenght, which means (for example)
+  ## perpendicular axes of equal length, which means (for example)
   ## it cannot transform a sphere into an ellipsoid.
   ## `tol` is used as tolerance for both equal length comparison 
   ## and perpendicular comparison.
@@ -348,7 +348,7 @@ proc mirror*(planeperp:TVector3d):TMatrix3d {.noInit.}=
   # https://en.wikipedia.org/wiki/Transformation_matrix
   var n=planeperp
   if not n.tryNormalize:
-    raise newException(EDivByZero,"Cannot mirror over a plane with a zero length normal")
+    raise newException(DivByZeroError,"Cannot mirror over a plane with a zero length normal")
   
   let
     a=n.x
@@ -375,7 +375,7 @@ proc mirror*(org:TPoint3d,planeperp:TVector3d):TMatrix3d {.noInit.}=
   # With some fiddling this becomes reasonably simple:
   var n=planeperp
   if not n.tryNormalize:
-    raise newException(EDivByZero,"Cannot mirror over a plane with a zero length normal")
+    raise newException(DivByZeroError,"Cannot mirror over a plane with a zero length normal")
   
   let
     a=n.x
@@ -448,7 +448,7 @@ proc inverse*(m:TMatrix3d):TMatrix3d {.noInit.}=
     O19=m.bx*m.cy-m.by*m.cx
 
   if det==0.0:
-    raise newException(EDivByZero,"Cannot normalize zero length vector")
+    raise newException(DivByZeroError,"Cannot normalize zero length vector")
 
   result.setElements(
     (m.bw*O4+m.by*O3-m.bz*O2)/det    , (-m.aw*O4-m.ay*O3+m.az*O2)/det,
@@ -483,7 +483,7 @@ proc equals*(m1:TMatrix3d,m2:TMatrix3d,tol=1.0e-6):bool=
     abs(m1.tw-m2.tw)<=tol
 
 proc `=~`*(m1,m2:TMatrix3d):bool=
-  ## Checks if `m1` and `m2` is aproximately equal, using a
+  ## Checks if `m1` and `m2` is approximately equal, using a
   ## tolerance of 1e-6.
   equals(m1,m2)
   
@@ -537,7 +537,7 @@ proc apply*(m:TMatrix3d, x,y,z:var float, translate=false)=
 # ***************************************
 #     TVector3d implementation
 # ***************************************
-proc Vector3d*(x,y,z:float):TVector3d=
+proc vector3d*(x,y,z:float):TVector3d=
   result.x=x
   result.y=y
   result.z=z
@@ -559,7 +559,7 @@ proc `len=`*(v:var TVector3d,newlen:float) {.noInit.} =
     v.z=0.0
     return
   
-  if fac==inf or fac==neginf:
+  if fac==Inf or fac==NegInf:
     #to short for float accuracy
     #do as good as possible:
     v.x=newlen
@@ -670,7 +670,7 @@ proc normalize*(v:var TVector3d) {.inline.}=
   ## Modifies `v` to have a length of 1.0, keeping its angle.
   ## If  `v` has zero length, an EDivByZero will be raised.
   if not tryNormalize(v):
-    raise newException(EDivByZero,"Cannot normalize zero length vector")
+    raise newException(DivByZeroError,"Cannot normalize zero length vector")
 
 proc rotate*(vec:var TVector3d,angle:float,axis:TVector3d)=
   ## Rotates `vec` in place, with `angle` radians over `axis`, which passes 
@@ -681,7 +681,7 @@ proc rotate*(vec:var TVector3d,angle:float,axis:TVector3d)=
   
   var normax=axis
   if not normax.tryNormalize:
-    raise newException(EDivByZero,"Cannot rotate around zero length axis")
+    raise newException(DivByZeroError,"Cannot rotate around zero length axis")
   
   let
     cs=cos(angle)
@@ -788,7 +788,7 @@ proc angleTo*(v1,v2:TVector3d):float=
 proc arbitraryAxis*(norm:TVector3d):TMatrix3d {.noInit.}=
   ## Computes the rotation matrix that would transform
   ## world z vector into `norm`. The inverse of this matrix
-  ## is useful to tranform a planar 3d object to 2d space.
+  ## is useful to transform a planar 3d object to 2d space.
   ## This is the same algorithm used to interpret DXF and DWG files.
   const lim=1.0/64.0
   var ax,ay,az:TVector3d
@@ -812,7 +812,7 @@ proc bisect*(v1,v2:TVector3d):TVector3d {.noInit.}=
   ## Computes the bisector between v1 and v2 as a normalized vector.
   ## If one of the input vectors has zero length, a normalized version
   ## of the other is returned. If both input vectors has zero length, 
-  ## an arbitrary normalized vector `v1`is returned.
+  ## an arbitrary normalized vector `v1` is returned.
   var
     vmag1=v1.len
     vmag2=v2.len
@@ -842,9 +842,9 @@ proc bisect*(v1,v2:TVector3d):TVector3d {.noInit.}=
     # there are actually inifinitely many bisectors, we select just 
     # one of them.
     result=v1.cross(XAXIS)
-    if result.sqrlen<1.0e-9:
+    if result.sqrLen<1.0e-9:
       result=v1.cross(YAXIS)
-      if result.sqrlen<1.0e-9:
+      if result.sqrLen<1.0e-9:
         result=v1.cross(ZAXIS) # now we should be guaranteed to have succeeded
     result.normalize
 
@@ -853,7 +853,7 @@ proc bisect*(v1,v2:TVector3d):TVector3d {.noInit.}=
 # ***************************************
 #     TPoint3d implementation
 # ***************************************
-proc Point3d*(x,y,z:float):TPoint3d=
+proc point3d*(x,y,z:float):TPoint3d=
   result.x=x
   result.y=y
   result.z=z

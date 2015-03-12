@@ -1,19 +1,19 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
 #    distribution, for details about the copyright.
 #
 
-## `Actor`:idx: support for Nimrod. An actor is implemented as a thread with
+## `Actor`:idx: support for Nim. An actor is implemented as a thread with
 ## a channel as its inbox. This module requires the ``--threads:on``
 ## command line switch.
 ##
 ## Example:
 ##
-## .. code-block:: nimrod
+## .. code-block:: nim
 ##
 ##      var
 ##        a: TActorPool[int, void]
@@ -21,6 +21,11 @@
 ##      for i in 0 .. < 300:
 ##        a.spawn(i, proc (x: int) {.thread.} = echo x)
 ##      a.join()
+##
+## **Note**: This whole module is deprecated. Use `threadpool` and ``spawn``
+## instead.
+
+{.deprecated.}
 
 from os import sleep
 
@@ -195,7 +200,7 @@ template schedule =
   if minIdx >= 0:
     p.actors[minIdx].i.send(t)
   else:
-    raise newException(EDeadThread, "cannot send message; thread died")
+    raise newException(DeadThreadError, "cannot send message; thread died")
 
 proc spawn*[TIn, TOut](p: var TActorPool[TIn, TOut], input: TIn,
                        action: proc (input: TIn): TOut {.thread.}

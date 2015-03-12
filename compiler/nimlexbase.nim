@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -37,7 +37,7 @@ const
   NewLines* = {CR, LF}
 
 type 
-  TBaseLexer* = object of TObject
+  TBaseLexer* = object of RootObj
     bufpos*: int
     buf*: cstring
     bufLen*: int              # length of buffer in characters
@@ -166,4 +166,4 @@ proc getCurrentLine(L: TBaseLexer, marker: bool = true): string =
     inc(i)
   result.add("\n")
   if marker: 
-    result.add(repeatChar(getColNumber(L, L.bufpos)) & '^' & "\n")
+    result.add(spaces(getColNumber(L, L.bufpos)) & '^' & "\n")

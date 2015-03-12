@@ -1,7 +1,7 @@
 #
 #
-#            Nimrod Tester
-#        (c) Copyright 2014 Andreas Rumpf
+#            Nim Tester
+#        (c) Copyright 2015 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
 #    distribution, for details about the copyright.
@@ -10,7 +10,7 @@
 import parseutils, strutils, os, osproc, streams, parsecfg
 
 const
-  cmdTemplate* = r"nimrod $target --hints:on $options $file"
+  cmdTemplate* = r"nim $target --hints:on $options $file"
 
 type
   TTestAction* = enum
@@ -18,7 +18,7 @@ type
     actionRun = "run"
     actionReject = "reject"
   TResultEnum* = enum
-    reNimrodcCrash,     # nimrod compiler seems to have crashed
+    reNimcCrash,     # nim compiler seems to have crashed
     reMsgsDiffer,       # error messages differ
     reFilesDiffer,      # expected and given filenames differ
     reLinesDiffer,      # expected and given line numbers differ
@@ -48,6 +48,7 @@ type
     err*: TResultEnum
     substr*, sortoutput*: bool
     targets*: set[TTarget]
+    nimout*: string
 
 const
   targetToExt*: array[TTarget, string] = ["c", "cpp", "m", "js"]
@@ -59,7 +60,7 @@ when not declared(parseCfgBool):
     case normalize(s)
     of "y", "yes", "true", "1", "on": result = true
     of "n", "no", "false", "0", "off": result = false
-    else: raise newException(EInvalidValue, "cannot interpret as a bool: " & s)
+    else: raise newException(ValueError, "cannot interpret as a bool: " & s)
 
 proc extractSpec(filename: string): string =
   const tripleQuote = "\"\"\""
@@ -78,7 +79,7 @@ when not defined(nimhygiene):
 
 template parseSpecAux(fillResult: stmt) {.immediate.} =
   var ss = newStringStream(extractSpec(filename))
-  var p {.inject.}: TCfgParser
+  var p {.inject.}: CfgParser
   open(p, ss, filename, 1)
   while true:
     var e {.inject.} = next(p)
@@ -94,6 +95,7 @@ proc parseSpec*(filename: string): TSpec =
   result.file = filename
   result.msg = ""
   result.outp = ""
+  result.nimout = ""
   result.ccodeCheck = ""
   result.cmd = cmdTemplate
   parseSpecAux:
@@ -124,6 +126,8 @@ proc parseSpec*(filename: string): TSpec =
     of "errormsg":
       result.msg = e.value
       result.action = actionReject
+    of "nimout":
+      result.nimout = e.value
     of "disabled":
       if parseCfgBool(e.value): result.err = reIgnored
     of "cmd": result.cmd = e.value

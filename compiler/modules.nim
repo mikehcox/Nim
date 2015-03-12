@@ -1,7 +1,7 @@
 #
 #
-#           The Nimrod Compiler
-#        (c) Copyright 2014 Andreas Rumpf
+#           The Nim Compiler
+#        (c) Copyright 2015 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
 #    distribution, for details about the copyright.
@@ -33,9 +33,6 @@ var
 proc getModule(fileIdx: int32): PSym =
   if fileIdx >= 0 and fileIdx < gCompiledModules.len:
     result = gCompiledModules[fileIdx]
-
-template compiledAt(x: PSym): expr =
-  gMemCacheData[x.position].compiledAt
 
 template crc(x: PSym): expr =
   gMemCacheData[x.position].crc
@@ -74,10 +71,12 @@ proc addDep(x: PSym, dep: int32) =
 
 proc resetModule*(fileIdx: int32) =
   # echo "HARD RESETTING ", fileIdx.toFilename
-  gMemCacheData[fileIdx].needsRecompile = Yes
-  gCompiledModules[fileIdx] = nil
-  cgendata.gModules[fileIdx] = nil
-  resetSourceMap(fileIdx)
+  if fileIdx <% gMemCacheData.len:
+    gMemCacheData[fileIdx].needsRecompile = Yes
+  if fileIdx <% gCompiledModules.len:
+    gCompiledModules[fileIdx] = nil
+  if fileIdx <% cgendata.gModules.len:
+    cgendata.gModules[fileIdx] = nil
 
 proc resetAllModules* =
   for i in 0..gCompiledModules.high:
@@ -117,7 +116,7 @@ proc newModule(fileIdx: int32): PSym =
   result.kind = skModule
   let filename = fileIdx.toFullPath
   result.name = getIdent(splitFile(filename).name)
-  if not isNimrodIdentifier(result.name.s):
+  if result.name.s != "-" and not isNimIdentifier(result.name.s):
     rawMessage(errInvalidModuleName, result.name.s)
   
   result.info = newLineInfo(fileIdx, 1, 1)
@@ -177,7 +176,7 @@ proc includeModule*(s: PSym, fileIdx: int32): PNode {.procvar.} =
 proc `==^`(a, b: string): bool =
   try:
     result = sameFile(a, b)
-  except EOS:
+  except OSError:
     result = false
 
 proc compileSystemModule* =
@@ -185,8 +184,18 @@ proc compileSystemModule* =
     systemFileIdx = fileInfoIdx(options.libpath/"system.nim")
     discard compileModule(systemFileIdx, {sfSystemModule})
 
-proc compileProject*(projectFile = gProjectMainIdx) =
+proc wantMainModule* =
+  if gProjectFull.len == 0:
+    fatal(gCmdLineInfo, errCommandExpectsFilename)
+  gProjectMainIdx = addFileExt(gProjectFull, NimExt).fileInfoIdx
+
+passes.gIncludeFile = includeModule
+passes.gImportModule = importModule
+
+proc compileProject*(projectFileIdx = -1'i32) =
+  wantMainModule()
   let systemFileIdx = fileInfoIdx(options.libpath / "system.nim")
+  let projectFile = if projectFileIdx < 0: gProjectMainIdx else: projectFileIdx
   if projectFile == systemFileIdx:
     discard compileModule(projectFile, {sfMainModule, sfSystemModule})
   else:

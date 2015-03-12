@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -30,14 +30,16 @@ proc reprStrAux(result: var string, s: string) =
     add result, "nil"
     return
   add result, reprPointer(cast[pointer](s)) & "\""
-  for c in items(s):
+  for i in 0.. <s.len:
+    let c = s[i]
     case c
     of '"': add result, "\\\""
     of '\\': add result, "\\\\" # BUGFIX: forgotten
     of '\10': add result, "\\10\"\n\"" # " \n " # better readability
     of '\128' .. '\255', '\0'..'\9', '\11'..'\31':
       add result, "\\" & reprInt(ord(c))
-    else: result.add(c)
+    else:
+      result.add(c)
   add result, "\""
 
 proc reprStr(s: string): string {.compilerRtl.} =
@@ -78,7 +80,7 @@ proc reprEnum(e: int, typ: PNimType): string {.compilerRtl.} =
 type
   PByteArray = ptr array[0.. 0xffff, int8]
 
-proc addSetElem(result: var string, elem: int, typ: PNimType) {.gcsafe.} =
+proc addSetElem(result: var string, elem: int, typ: PNimType) {.benign.} =
   case typ.kind
   of tyEnum: add result, reprEnum(elem, typ)
   of tyBool: add result, reprBool(bool(elem))
@@ -147,7 +149,7 @@ when not defined(useNimRtl):
     for i in 0..cl.indent-1: add result, ' '
 
   proc reprAux(result: var string, p: pointer, typ: PNimType,
-               cl: var TReprClosure) {.gcsafe.}
+               cl: var TReprClosure) {.benign.}
 
   proc reprArray(result: var string, p: pointer, typ: PNimType,
                  cl: var TReprClosure) =
@@ -155,7 +157,7 @@ when not defined(useNimRtl):
     var bs = typ.base.size
     for i in 0..typ.size div bs - 1:
       if i > 0: add result, ", "
-      reprAux(result, cast[pointer](cast[TAddress](p) + i*bs), typ.base, cl)
+      reprAux(result, cast[pointer](cast[ByteAddress](p) + i*bs), typ.base, cl)
     add result, "]"
 
   proc reprSequence(result: var string, p: pointer, typ: PNimType,
@@ -167,25 +169,25 @@ when not defined(useNimRtl):
     var bs = typ.base.size
     for i in 0..cast[PGenericSeq](p).len-1:
       if i > 0: add result, ", "
-      reprAux(result, cast[pointer](cast[TAddress](p) + GenericSeqSize + i*bs),
+      reprAux(result, cast[pointer](cast[ByteAddress](p) + GenericSeqSize + i*bs),
               typ.base, cl)
     add result, "]"
 
   proc reprRecordAux(result: var string, p: pointer, n: ptr TNimNode,
-                     cl: var TReprClosure) {.gcsafe.} =
+                     cl: var TReprClosure) {.benign.} =
     case n.kind
     of nkNone: sysAssert(false, "reprRecordAux")
     of nkSlot:
       add result, $n.name
       add result, " = "
-      reprAux(result, cast[pointer](cast[TAddress](p) + n.offset), n.typ, cl)
+      reprAux(result, cast[pointer](cast[ByteAddress](p) + n.offset), n.typ, cl)
     of nkList:
       for i in 0..n.len-1:
         if i > 0: add result, ",\n"
         reprRecordAux(result, p, n.sons[i], cl)
     of nkCase:
       var m = selectBranch(p, n)
-      reprAux(result, cast[pointer](cast[TAddress](p) + n.offset), n.typ, cl)
+      reprAux(result, cast[pointer](cast[ByteAddress](p) + n.offset), n.typ, cl)
       if m != nil: reprRecordAux(result, p, m, cl)
 
   proc reprRecord(result: var string, p: pointer, typ: PNimType,
@@ -265,7 +267,7 @@ proc reprOpenArray(p: pointer, length: int, elemtyp: PNimType): string {.
   var bs = elemtyp.size
   for i in 0..length - 1:
     if i > 0: add result, ", "
-    reprAux(result, cast[pointer](cast[TAddress](p) + i*bs), elemtyp, cl)
+    reprAux(result, cast[pointer](cast[ByteAddress](p) + i*bs), elemtyp, cl)
   add result, "]"
   deinitReprClosure(cl)
 

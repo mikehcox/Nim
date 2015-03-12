@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -44,8 +44,8 @@ proc parseTopLevelStmt*(p: var TParsers): PNode
 proc parseFile(fileIdx: int32): PNode =
   var 
     p: TParsers
-    f: TFile
-  let filename = fileIdx.toFullPath
+    f: File
+  let filename = fileIdx.toFullPathConsiderDirty
   if not open(f, filename):
     rawMessage(errCannotOpenFile, filename)
     return 
@@ -163,7 +163,7 @@ proc evalPipe(p: var TParsers, n: PNode, filename: string,
 proc openParsers(p: var TParsers, fileIdx: int32, inputstream: PLLStream) = 
   var s: PLLStream
   p.skin = skinStandard
-  let filename = fileIdx.toFullPath
+  let filename = fileIdx.toFullPathConsiderDirty
   var pipe = parsePipe(filename, inputstream)
   if pipe != nil: s = evalPipe(p, pipe, filename, inputstream)
   else: s = inputstream

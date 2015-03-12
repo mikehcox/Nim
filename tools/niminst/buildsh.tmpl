@@ -1,5 +1,5 @@
 #! stdtmpl(subsChar='?') | standard
-#proc generateBuildShellScript(c: TConfigData): string = 
+#proc generateBuildShellScript(c: ConfigData): string = 
 #  result = "#! /bin/sh\n# Generated from niminst\n" &
 #           "# Template is in tools/buildsh.tmpl\n" &
 #           "# To regenerate run ``niminst csource`` or ``koch csource``\n"
@@ -54,8 +54,14 @@ case $uos in
     myos="linux" 
     LINK_FLAGS="$LINK_FLAGS -ldl -lm"
     ;;
-  *freebsd* | *dragonfly* ) 
+  *dragonfly* )
     myos="freebsd"
+    LINK_FLAGS="$LINK_FLAGS -lm"
+    ;;
+  *freebsd* )
+    myos="freebsd"
+    CC="clang"
+    LINKER="clang"
     LINK_FLAGS="$LINK_FLAGS -lm"
     ;;
   *openbsd* )

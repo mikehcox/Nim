@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -23,7 +23,8 @@ type
     id: int                  # for generating IDs
     toc, section: TSections
     indexValFilename: string
-    seenSymbols: PStringTable # avoids duplicate symbol generation for HTML.
+    analytics: string  # Google Analytics javascript, "" if doesn't exist
+    seenSymbols: StringTableRef # avoids duplicate symbol generation for HTML.
 
   PDoc* = ref TDocumentor ## Alias to type less.
 
@@ -41,6 +42,7 @@ proc compilerMsgHandler(filename: string, line, col: int,
   of mwRedefinitionOfLabel: k = warnRedefinitionOfLabel
   of mwUnknownSubstitution: k = warnUnknownSubstitutionX
   of mwUnsupportedLanguage: k = warnLanguageXNotSupported
+  of mwUnsupportedField: k = warnFieldXNotSupported
   globalError(newLineInfo(filename, line, col), k, arg)
 
 proc docgenFindFile(s: string): string {.procvar.} =
@@ -55,11 +57,28 @@ proc parseRst(text, filename: string,
   result = rstParse(text, filename, line, column, hasToc, rstOptions,
                     docgenFindFile, compilerMsgHandler)
 
-proc newDocumentor*(filename: string, config: PStringTable): PDoc =
+proc newDocumentor*(filename: string, config: StringTableRef): PDoc =
   new(result)
   initRstGenerator(result[], (if gCmd != cmdRst2tex: outHtml else: outLatex),
                    options.gConfigVars, filename, {roSupportRawDirective},
                    docgenFindFile, compilerMsgHandler)
+
+  if config.hasKey("doc.googleAnalytics"):
+    result.analytics = """
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', '$1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+    """ % [config["doc.googleAnalytics"]]
+  else:
+    result.analytics = ""
+
   result.seenSymbols = newStringTable(modeCaseInsensitive)
   result.id = 100
 
@@ -107,7 +126,7 @@ proc ropeFormatNamedVars(frmt: TFormatStr, varnames: openArray[string],
           if not (frmt[i] in {'A'..'Z', '_', 'a'..'z', '\x80'..'\xFF'}): break
         var idx = getVarIdx(varnames, id)
         if idx >= 0: app(result, varvalues[idx])
-        else: rawMessage(errUnkownSubstitionVar, id)
+        else: rawMessage(errUnknownSubstitionVar, id)
       of '{':
         var id = ""
         inc(i)
@@ -119,7 +138,7 @@ proc ropeFormatNamedVars(frmt: TFormatStr, varnames: openArray[string],
                               # search for the variable:
         var idx = getVarIdx(varnames, id)
         if idx >= 0: app(result, varvalues[idx])
-        else: rawMessage(errUnkownSubstitionVar, id)
+        else: rawMessage(errUnknownSubstitionVar, id)
       else: internalError("ropeFormatNamedVars")
     var start = i
     while i < L:
@@ -253,7 +272,7 @@ proc complexName(k: TSymKind, n: PNode, baseName: string): string =
   ## type)?(,param type)*``. The callable type part will be added only if the
   ## node is not a proc, as those are the common ones. The suffix will be a dot
   ## and a single letter representing the type of the callable. The parameter
-  ## types will be added with a preceeding dash. Return types won't be added.
+  ## types will be added with a preceding dash. Return types won't be added.
   ##
   ## If you modify the output of this proc, please update the anchor generation
   ## section of ``doc/docgen.txt``.
@@ -374,15 +393,17 @@ proc genItem(d: PDoc, n, nameNode: PNode, k: TSymKind) =
     cleanPlainSymbol = renderPlainSymbolName(nameNode)
     complexSymbol = complexName(k, n, cleanPlainSymbol)
     plainSymbolRope = toRope(cleanPlainSymbol)
-    plainSymbolEncRope = toRope(URLEncode(cleanPlainSymbol))
+    plainSymbolEncRope = toRope(encodeUrl(cleanPlainSymbol))
     itemIDRope = toRope(d.id)
     symbolOrId = d.newUniquePlainSymbol(complexSymbol)
     symbolOrIdRope = symbolOrId.toRope
-    symbolOrIdEncRope = URLEncode(symbolOrId).toRope
+    symbolOrIdEncRope = encodeUrl(symbolOrId).toRope
 
   var seeSrcRope: PRope = nil
   let docItemSeeSrc = getConfigVar("doc.item.seesrc")
   if docItemSeeSrc.len > 0 and options.docSeeSrcUrl.len > 0:
+    # XXX toFilename doesn't really work. We need to ensure that this keeps
+    # returning a relative path.
     let urlRope = ropeFormatNamedVars(options.docSeeSrcUrl,
       ["path", "line"], [n.info.toFilename.toRope, toRope($n.info.line)])
     dispA(seeSrcRope, "$1", "", [ropeFormatNamedVars(docItemSeeSrc,
@@ -411,7 +432,7 @@ proc genItem(d: PDoc, n, nameNode: PNode, k: TSymKind) =
   setIndexTerm(d[], symbolOrId, name, linkTitle,
     xmltree.escape(plainDocstring.docstringSummary))
 
-proc genJSONItem(d: PDoc, n, nameNode: PNode, k: TSymKind): PJsonNode =
+proc genJSONItem(d: PDoc, n, nameNode: PNode, k: TSymKind): JsonNode =
   if not isVisible(nameNode): return
   var
     name = getName(d, nameNode)
@@ -471,7 +492,7 @@ proc generateDoc*(d: PDoc, n: PNode) =
   of nkFromStmt, nkImportExceptStmt: traceDeps(d, n.sons[0])
   else: discard
 
-proc generateJson(d: PDoc, n: PNode, jArray: PJsonNode = nil): PJsonNode =
+proc generateJson(d: PDoc, n: PNode, jArray: JsonNode = nil): JsonNode =
   case n.kind
   of nkCommentStmt:
     if n.comment != nil and startsWith(n.comment, "##"):
@@ -559,10 +580,10 @@ proc genOutFile(d: PDoc): PRope =
     # XXX what is this hack doing here? 'optCompileOnly' means raw output!?
     code = ropeFormatNamedVars(getConfigVar("doc.file"), ["title",
         "tableofcontents", "moduledesc", "date", "time",
-        "content", "author", "version"],
+        "content", "author", "version", "analytics"],
         [title.toRope, toc, d.modDesc, toRope(getDateStr()),
                      toRope(getClockStr()), content, d.meta[metaAuthor].toRope,
-                     d.meta[metaVersion].toRope])
+                     d.meta[metaVersion].toRope, d.analytics.toRope])
   else:
     code = content
   result = code
@@ -627,7 +648,8 @@ proc commandBuildIndex*() =
 
   let code = ropeFormatNamedVars(getConfigVar("doc.file"), ["title",
       "tableofcontents", "moduledesc", "date", "time",
-      "content", "author", "version"],
+      "content", "author", "version", "analytics"],
       ["Index".toRope, nil, nil, toRope(getDateStr()),
-                   toRope(getClockStr()), content, nil, nil])
+                   toRope(getClockStr()), content, nil, nil, nil])
+  # no analytics because context is not available
   writeRope(code, getOutFile("theindex", HtmlExt))

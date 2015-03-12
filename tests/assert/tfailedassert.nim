@@ -1,6 +1,6 @@
 discard """
   output: '''
-WARNING: false first asseertion from bar
+WARNING: false first assertion from bar
 ERROR: false second assertion from bar
 -1
 tfailedassert.nim:27 false assertion from foo
@@ -10,7 +10,7 @@ tfailedassert.nim:27 false assertion from foo
 type
   TLineInfo = tuple[filename: string, line: int]
 
-  TMyError = object of E_Base
+  TMyError = object of Exception
     lineinfo: TLineInfo
 
   EMyError = ref TMyError
@@ -31,7 +31,7 @@ proc bar: int =
   # in this proc
   onFailedAssert(msg): echo "WARNING: " & msg
     
-  assert(false, "first asseertion from bar")
+  assert(false, "first assertion from bar")
 
   onFailedAssert(msg):
     echo "ERROR: " & msg

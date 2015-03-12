@@ -1,12 +1,12 @@
 # Test for a hard to fix internal error
-# occured in the SDL library
+# occurred in the SDL library
 
 {.push dynlib: "SDL.dll", callconv: cdecl.}
 
 type
   PSDL_semaphore = ptr TSDL_semaphore
   TSDL_semaphore {.final.} = object
-    sem: Pointer             #PSem_t;
+    sem: pointer             #PSem_t;
     when not defined(USE_NAMED_SEMAPHORES):
       sem_data: int
     when defined(BROKEN_SEMGETVALUE):
@@ -18,5 +18,5 @@ type
   PSDL_Sem = ptr TSDL_Sem
   TSDL_Sem = TSDL_Semaphore
 
-proc SDL_CreateSemaphore(initial_value: Int32): PSDL_Sem {.
+proc SDL_CreateSemaphore(initial_value: int32): PSDL_Sem {.
   importc: "SDL_CreateSemaphore".}

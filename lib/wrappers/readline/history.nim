@@ -142,7 +142,7 @@ proc history_get*(a2: cint): ptr THIST_ENTRY{.cdecl, importc: "history_get",
 # Return the timestamp associated with the HIST_ENTRY * passed as an
 #   argument 
 
-proc history_get_time*(a2: ptr THIST_ENTRY): TTime{.cdecl, 
+proc history_get_time*(a2: ptr THIST_ENTRY): Time{.cdecl, 
     importc: "history_get_time", dynlib: historyDll.}
 # Return the number of bytes that the primary history entries are using.
 #   This just adds up the lengths of the_history->lines. 
@@ -231,7 +231,7 @@ proc history_truncate_file*(a2: cstring, a3: cint): cint{.cdecl,
 #  -1) If there was an error in expansion.
 #   2) If the returned line should just be printed.
 #
-#  If an error ocurred in expansion, then OUTPUT contains a descriptive
+#  If an error occurred in expansion, then OUTPUT contains a descriptive
 #  error message. 
 
 proc history_expand*(a2: cstring, a3: cstringArray): cint{.cdecl, 

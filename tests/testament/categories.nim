@@ -1,7 +1,7 @@
 #
 #
-#            Nimrod Tester
-#        (c) Copyright 2014 Andreas Rumpf
+#            Nim Tester
+#        (c) Copyright 2015 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
 #    distribution, for details about the copyright.
@@ -20,7 +20,7 @@ const
 proc delNimCache() =
   try:
     removeDir(nimcacheDir)
-  except EOS:
+  except OSError:
     echo "[Warning] could not delete: ", nimcacheDir
     
 proc runRodFiles(r: var TResults, cat: Category, options: string) =
@@ -71,7 +71,7 @@ proc compileRodFiles(r: var TResults, cat: Category, options: string) =
 proc safeCopyFile(src, dest: string) =
   try:
     copyFile(src, dest)
-  except EOS:
+  except OSError:
     echo "[Warning] could not copy: ", src, " to ", dest
 
 proc runBasicDLLTest(c, r: var TResults, cat: Category, options: string) =
@@ -87,7 +87,7 @@ proc runBasicDLLTest(c, r: var TResults, cat: Category, options: string) =
   else:
     # posix relies on crappy LD_LIBRARY_PATH (ugh!):
     var libpath = getenv"LD_LIBRARY_PATH".string
-    if peg"\i '/nimrod' (!'/')* '/lib'" notin libpath:
+    if peg"\i '/nim' (!'/')* '/lib'" notin libpath:
       echo "[Warning] insufficient LD_LIBRARY_PATH"
     var serverDll = DynlibFormat % "server"
     safeCopyFile("tests/dll" / serverDll, "lib" / serverDll)
@@ -107,30 +107,36 @@ proc dllTests(r: var TResults, cat: Category, options: string) =
 # ------------------------------ GC tests -------------------------------------
 
 proc gcTests(r: var TResults, cat: Category, options: string) =
-  template test(filename: expr): stmt =
+  template testWithoutMs(filename: expr): stmt =
     testSpec r, makeTest("tests/gc" / filename, options, cat, actionRun)
     testSpec r, makeTest("tests/gc" / filename, options &
                   " -d:release", cat, actionRun)
     testSpec r, makeTest("tests/gc" / filename, options &
                   " -d:release -d:useRealtimeGC", cat, actionRun)
+
+  template test(filename: expr): stmt =
+    testWithoutMs filename
     testSpec r, makeTest("tests/gc" / filename, options &
                   " --gc:markAndSweep", cat, actionRun)
     testSpec r, makeTest("tests/gc" / filename, options &
                   " -d:release --gc:markAndSweep", cat, actionRun)
-  
+
+  test "growobjcrash"
   test "gcbench"
   test "gcleak"
   test "gcleak2"
   test "gctest"
   test "gcleak3"
   test "gcleak4"
-  test "gcleak5"
+  # Disabled because it works and takes too long to run:
+  #test "gcleak5"
   test "weakrefs"
   test "cycleleak"
   test "closureleak"
-  test "refarrayleak"
-  test "stackrefleak"
+  testWithoutMs "refarrayleak"
   
+  test "stackrefleak"
+  test "cyclecollector"
 
 # ------------------------- threading tests -----------------------------------
 
@@ -192,9 +198,9 @@ proc jsTests(r: var TResults, cat: Category, options: string) =
 #    testSpec(r, t, options)
 
 proc findMainFile(dir: string): string =
-  # finds the file belonging to ".nimrod.cfg"; if there is no such file
+  # finds the file belonging to ".nim.cfg"; if there is no such file
   # it returns the some ".nim" file if there is only one: 
-  const cfgExt = ".nimrod.cfg"
+  const cfgExt = ".nim.cfg"
   result = ""
   var nimFiles = 0
   for kind, file in os.walkDir(dir):
@@ -224,20 +230,20 @@ proc testStdlib(r: var TResults, pattern, options: string, cat: Category) =
     else:
       testNoSpec r, makeTest(test, options, cat, actionCompile)
 
-# ----------------------------- babel ----------------------------------------
+# ----------------------------- nimble ----------------------------------------
 type PackageFilter = enum
   pfCoreOnly
   pfExtraOnly
   pfAll
 
 let 
-  babelExe = findExe("babel")
-  babelDir = getHomeDir() / ".babel"
-  packageDir = babelDir / "pkgs"
-  packageIndex = babelDir / "packages.json"
+  nimbleExe = findExe("nimble")
+  nimbleDir = getHomeDir() / ".nimble"
+  packageDir = nimbleDir / "pkgs"
+  packageIndex = nimbleDir / "packages.json"
 
-proc waitForExitEx(p: PProcess): int =
-  var outp: PStream = outputStream(p)
+proc waitForExitEx(p: Process): int =
+  var outp = outputStream(p)
   var line = newStringOfCap(120).TaintedString
   while true:
     if outp.readLine(line):
@@ -249,8 +255,8 @@ proc waitForExitEx(p: PProcess): int =
 
 proc getPackageDir(package: string): string =
   ## TODO - Replace this with dom's version comparison magic.
-  var commandOutput = execCmdEx("babel path $#" % package)
-  if commandOutput.exitCode != quitSuccess:
+  var commandOutput = execCmdEx("nimble path $#" % package)
+  if commandOutput.exitCode != QuitSuccess:
     return ""
   else:
     result = commandOutput[0].string
@@ -262,7 +268,7 @@ iterator listPackages(filter: PackageFilter): tuple[name, url: string] =
     let
       name = package["name"].str
       url = package["url"].str
-      isCorePackage = "nimrod-code" in normalize(url)
+      isCorePackage = "nim-lang" in normalize(url)
     case filter:
     of pfCoreOnly:
       if isCorePackage:
@@ -273,13 +279,13 @@ iterator listPackages(filter: PackageFilter): tuple[name, url: string] =
     of pfAll:
       yield (name, url)
 
-proc testBabelPackages(r: var TResults, cat: Category, filter: PackageFilter) =
-  if babelExe == "":
-    echo("[Warning] - Cannot run babel tests: Babel binary not found.")
+proc testNimblePackages(r: var TResults, cat: Category, filter: PackageFilter) =
+  if nimbleExe == "":
+    echo("[Warning] - Cannot run nimble tests: Nimble binary not found.")
     return
 
-  if execCmd("$# update" % babelExe) == quitFailure:
-    echo("[Warning] - Cannot run babel tests: Babel update failed.")
+  if execCmd("$# update" % nimbleExe) == QuitFailure:
+    echo("[Warning] - Cannot run nimble tests: Nimble update failed.")
     return
 
   let packageFileTest = makeTest("PackageFileParsed", "", cat)
@@ -288,31 +294,30 @@ proc testBabelPackages(r: var TResults, cat: Category, filter: PackageFilter) =
       var test = makeTest(name, "", cat)
       echo(url)
       let
-        installProcess = startProcess(babelExe, "", ["install", "-y", name])
+        installProcess = startProcess(nimbleExe, "", ["install", "-y", name])
         installStatus = waitForExitEx(installProcess)
       installProcess.close
-      if installStatus != quitSuccess:
+      if installStatus != QuitSuccess:
         r.addResult(test, "", "", reInstallFailed)
         continue
 
       let
-        buildPath = getPackageDir(name)[0.. -3]
-      let
-        buildProcess = startProcess(babelExe, buildPath, ["build"])
+        buildPath = getPackageDir(name).strip
+        buildProcess = startProcess(nimbleExe, buildPath, ["build"])
         buildStatus = waitForExitEx(buildProcess)
       buildProcess.close
-      if buildStatus != quitSuccess:
+      if buildStatus != QuitSuccess:
         r.addResult(test, "", "", reBuildFailed)
       r.addResult(test, "", "", reSuccess)
     r.addResult(packageFileTest, "", "", reSuccess)
-  except EJsonParsingError:
-    echo("[Warning] - Cannot run babel tests: Invalid package file.")
+  except JsonParsingError:
+    echo("[Warning] - Cannot run nimble tests: Invalid package file.")
     r.addResult(packageFileTest, "", "", reBuildFailed)
 
 
 # ----------------------------------------------------------------------------
 
-const AdditionalCategories = ["debugger", "examples", "stdlib", "babel-core"]
+const AdditionalCategories = ["debugger", "examples", "lib"]
 
 proc `&.?`(a, b: string): string =
   # candidate for the stdlib?
@@ -325,8 +330,9 @@ proc `&?.`(a, b: string): string =
 proc processCategory(r: var TResults, cat: Category, options: string) =
   case cat.string.normalize
   of "rodfiles":
-    compileRodFiles(r, cat, options)
-    runRodFiles(r, cat, options)
+    discard # Disabled for now
+    #compileRodFiles(r, cat, options)
+    #runRodFiles(r, cat, options)
   of "js":
     # XXX JS doesn't need to be special anymore
     jsTests(r, cat, options)
@@ -342,19 +348,19 @@ proc processCategory(r: var TResults, cat: Category, options: string) =
     threadTests r, cat, options & " --threads:on"
   of "io":
     ioTests r, cat, options
-  of "stdlib":
+  of "lib":
     testStdlib(r, "lib/pure/*.nim", options, cat)
     testStdlib(r, "lib/packages/docutils/highlite", options, cat)
   of "examples":
     compileExample(r, "examples/*.nim", options, cat)
     compileExample(r, "examples/gtk/*.nim", options, cat)
     compileExample(r, "examples/talk/*.nim", options, cat)
-  of "babel-core":
-    testBabelPackages(r, cat, pfCoreOnly)
-  of "babel-extra":
-    testBabelPackages(r, cat, pfExtraOnly)
-  of "babel-all":
-    testBabelPackages(r, cat, pfAll)
+  of "nimble-core":
+    testNimblePackages(r, cat, pfCoreOnly)
+  of "nimble-extra":
+    testNimblePackages(r, cat, pfExtraOnly)
+  of "nimble-all":
+    testNimblePackages(r, cat, pfAll)
   else:
     for name in os.walkFiles("tests" & DirSep &.? cat.string / "t*.nim"):
       testSpec r, makeTest(name, options, cat)

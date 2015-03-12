@@ -1,4 +1,5 @@
 import osproc, streams, os, strutils, re
+{.experimental.}
 
 ## Compiler as a service tester.
 ##
@@ -9,8 +10,8 @@ type
   TRunMode = enum
     ProcRun, CaasRun, SymbolProcRun
 
-  TNimrodSession* = object
-    nim: PProcess # Holds the open process for CaasRun sessions, nil otherwise.
+  NimSession* = object
+    nim: Process # Holds the open process for CaasRun sessions, nil otherwise.
     mode: TRunMode # Stores the type of run mode the session was started with.
     lastOutput: string # Preserves the last output, needed for ProcRun mode.
     filename: string # Appended to each command starting with '>'. Also a var.
@@ -26,15 +27,15 @@ const
 
 var
   TesterDir = getAppDir() / ".."
-  NimrodBin = TesterDir / "../bin/nimrod"
+  NimBin = TesterDir / "../bin/nim"
 
-proc replaceVars(session: var TNimrodSession, text: string): string =
+proc replaceVars(session: var NimSession, text: string): string =
   result = text.replace(filenameReplaceVar, session.filename)
   result = result.replace(moduleReplaceVar, session.modname)
   result = result.replace(silentReplaceVar, silentReplaceText)
 
-proc startNimrodSession(project, script: string, mode: TRunMode):
-                        TNimrodSession =
+proc startNimSession(project, script: string, mode: TRunMode):
+                        NimSession =
   let (dir, name, ext) = project.splitFile
   result.mode = mode
   result.lastOutput = ""
@@ -50,10 +51,10 @@ proc startNimrodSession(project, script: string, mode: TRunMode):
     removeDir(nimcacheDir / "nimcache")
 
   if mode == CaasRun:
-    result.nim = startProcess(NimrodBin, workingDir = dir,
+    result.nim = startProcess(NimBin, workingDir = dir,
       args = ["serve", "--server.type:stdin", name])
 
-proc doCaasCommand(session: var TNimrodSession, command: string): string =
+proc doCaasCommand(session: var NimSession, command: string): string =
   assert session.mode == CaasRun
   session.nim.inputStream.write(session.replaceVars(command) & "\n")
   session.nim.inputStream.flush
@@ -69,11 +70,13 @@ proc doCaasCommand(session: var TNimrodSession, command: string): string =
       result = "FAILED TO EXECUTE: " & command & "\n" & result
       break
 
-proc doProcCommand(session: var TNimrodSession, command: string): string =
-  assert session.mode == ProcRun or session.mode == SymbolProcRun
-  except: result = "FAILED TO EXECUTE: " & command & "\n" & result
+proc doProcCommand(session: var NimSession, command: string): string =
+  try:
+    assert session.mode == ProcRun or session.mode == SymbolProcRun
+  except:
+    result = "FAILED TO EXECUTE: " & command & "\n" & result
   var
-    process = startProcess(NimrodBin, args = session.replaceVars(command).split)
+    process = startProcess(NimBin, args = session.replaceVars(command).split)
     stream = outputStream(process)
     line = TaintedString("")
 
@@ -84,7 +87,7 @@ proc doProcCommand(session: var TNimrodSession, command: string): string =
 
   process.close()
 
-proc doCommand(session: var TNimrodSession, command: string) =
+proc doCommand(session: var NimSession, command: string) =
   if session.mode == CaasRun:
     if not session.nim.running:
       session.lastOutput = "FAILED TO EXECUTE: " & command & "\n" &
@@ -102,11 +105,11 @@ proc doCommand(session: var TNimrodSession, command: string) =
     session.lastOutput = doProcCommand(session,
                                        command & " " & session.filename)
 
-proc close(session: var TNimrodSession) {.destructor.} =
+proc destroy(session: var NimSession) {.destructor.} =
   if session.mode == CaasRun:
     session.nim.close
 
-proc doScenario(script: string, output: PStream, mode: TRunMode, verbose: bool): bool =
+proc doScenario(script: string, output: Stream, mode: TRunMode, verbose: bool): bool =
   result = true
 
   var f = open(script)
@@ -114,7 +117,7 @@ proc doScenario(script: string, output: PStream, mode: TRunMode, verbose: bool):
 
   if f.readLine(project):
     var
-      s = startNimrodSession(script.parentDir / project.string, script, mode)
+      s = startNimSession(script.parentDir / project.string, script, mode)
       tline = TaintedString("")
       ln = 1
 
@@ -171,7 +174,7 @@ when isMainModule:
     failures = 0
     verbose = false
 
-  for i in 0..ParamCount() - 1:
+  for i in 0..paramCount() - 1:
     let param = string(paramStr(i + 1))
     case param
     of "verbose": verbose = true

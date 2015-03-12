@@ -1,6 +1,6 @@
 #
 #
-#            Nimrod's Runtime Library
+#            Nim's Runtime Library
 #        (c) Copyright 2011 Alex Mitchell
 #
 #    See the file "copying.txt", included in this
@@ -31,7 +31,7 @@ proc concat*[T](seqs: varargs[seq[T]]): seq[T] =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     s1 = @[1, 2, 3]
   ##     s2 = @[4, 5]
@@ -47,10 +47,28 @@ proc concat*[T](seqs: varargs[seq[T]]): seq[T] =
       result[i] = itm
       inc(i)
 
+proc repeat*[T](s: seq[T], n: Natural): seq[T] =
+  ## Returns a new sequence with the items of `s` repeated `n` times.
+  ##
+  ## Example:
+  ##
+  ## .. code-block:
+  ##
+  ##   let
+  ##     s = @[1, 2, 3]
+  ##     total = s.repeat(3)
+  ##   assert total == @[1, 2, 3, 1, 2, 3, 1, 2, 3]
+  result = newSeq[T](n * s.len)
+  var o = 0
+  for x in 1..n:
+    for e in s:
+      result[o] = e
+      inc o
+
 proc deduplicate*[T](seq1: seq[T]): seq[T] =
   ## Returns a new sequence without duplicates.
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     dup1 = @[1, 1, 3, 4, 2, 2, 8, 1, 4]
   ##     dup2 = @["a", "a", "c", "d", "d"]
@@ -61,6 +79,8 @@ proc deduplicate*[T](seq1: seq[T]): seq[T] =
   result = @[]
   for itm in items(seq1):
     if not result.contains(itm): result.add(itm)
+
+{.deprecated: [distnct: deduplicate].}
     
 proc zip*[S, T](seq1: seq[S], seq2: seq[T]): seq[tuple[a: S, b: T]] =
   ## Returns a new sequence with a combination of the two input sequences.
@@ -69,7 +89,7 @@ proc zip*[S, T](seq1: seq[S], seq2: seq[T]): seq[tuple[a: S, b: T]] =
   ## fields `a` and `b`. If one sequence is shorter, the remaining items in the
   ## longer sequence are discarded. Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     short = @[1, 2, 3]
   ##     long = @[6, 5, 4, 3, 2, 1]
@@ -84,7 +104,7 @@ proc zip*[S, T](seq1: seq[S], seq2: seq[T]): seq[tuple[a: S, b: T]] =
   newSeq(result, m)
   for i in 0 .. m-1: result[i] = (seq1[i], seq2[i])
 
-proc distribute*[T](s: seq[T], num: int, spread = true): seq[seq[T]] =
+proc distribute*[T](s: seq[T], num: Positive, spread = true): seq[seq[T]] =
   ## Splits and distributes a sequence `s` into `num` sub sequences.
   ##
   ## Returns a sequence of `num` sequences. For some input values this is the
@@ -104,17 +124,18 @@ proc distribute*[T](s: seq[T], num: int, spread = true): seq[seq[T]] =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let numbers = @[1, 2, 3, 4, 5, 6, 7]
   ##   assert numbers.distribute(3) == @[@[1, 2, 3], @[4, 5], @[6, 7]]
   ##   assert numbers.distribute(3, false)  == @[@[1, 2, 3], @[4, 5, 6], @[7]]
   ##   assert numbers.distribute(6)[0] == @[1, 2]
   ##   assert numbers.distribute(6)[5] == @[7]
   assert(not s.isNil, "`s` can't be nil")
-  assert(num > 0, "`num` has to be greater than zero")
   if num < 2:
     result = @[s]
     return
+
+  let num = int(num) # XXX probably only needed because of .. bug
 
   # Create the result and calculate the stride size and the remainder if any.
   result = newSeq[seq[T]](num)
@@ -155,7 +176,7 @@ iterator filter*[T](seq1: seq[T], pred: proc(item: T): bool {.closure.}): T =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let numbers = @[1, 4, 5, 8, 9, 7, 4]
   ##   for n in filter(numbers, proc (x: int): bool = x mod 2 == 0):
   ##     echo($n)
@@ -169,7 +190,7 @@ proc filter*[T](seq1: seq[T], pred: proc(item: T): bool {.closure.}): seq[T] =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     colors = @["red", "yellow", "black"]
   ##     f1 = filter(colors, proc(x: string): bool = x.len < 6)
@@ -184,7 +205,7 @@ proc keepIf*[T](seq1: var seq[T], pred: proc(item: T): bool {.closure.}) =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   var floats = @[13.0, 12.5, 5.8, 2.0, 6.1, 9.9, 10.1]
   ##   keepIf(floats, proc(x: float): bool = x > 10)
   ##   assert floats == @[13.0, 12.5, 10.1]
@@ -202,7 +223,7 @@ proc delete*[T](s: var seq[T], first=0, last=0) =
   ##
   ## Example:
   ##
-  ##.. code-block:: nimrod
+  ##.. code-block::
   ##   let outcome = @[1,1,1,1,1,1,1,1]
   ##   var dest = @[1,1,1,2,2,2,2,2,2,1,1,1,1,1]
   ##   dest.delete(3, 8)
@@ -223,7 +244,7 @@ proc insert*[T](dest: var seq[T], src: openArray[T], pos=0) =
   ##
   ## Example:
   ##
-  ##.. code-block:: nimrod
+  ##.. code-block::
   ##   var dest = @[1,1,1,1,1,1,1,1]
   ##   let 
   ##     src = @[2,2,2,2,2,2]
@@ -254,7 +275,7 @@ template filterIt*(seq1, pred: expr): expr {.immediate.} =
   ## the ``it`` variable for testing, like: ``filterIt("abcxyz", it == 'x')``.
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##    let
   ##      temperatures = @[-272.15, -2.0, 24.5, 44.31, 99.9, -113.44]
   ##      acceptable = filterIt(temperatures, it < 50 and it > -10)
@@ -273,7 +294,7 @@ template keepItIf*(varSeq, pred: expr) =
   ## the ``it`` variable for testing, like: ``keepItIf("abcxyz", it == 'x')``.
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   var candidates = @["foo", "bar", "baz", "foobar"]
   ##   keepItIf(candidates, it.len == 3 and it[0] == 'b')
   ##   assert candidates == @["bar", "baz"]
@@ -292,7 +313,7 @@ template toSeq*(iter: expr): expr {.immediate.} =
   ##
   ## Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     numeric = @[1, 2, 3, 4, 5, 6, 7, 8, 9]
   ##     odd_numbers = toSeq(filter(numeric) do (x: int) -> bool:
@@ -300,6 +321,10 @@ template toSeq*(iter: expr): expr {.immediate.} =
   ##         result = true)
   ##   assert odd_numbers == @[1, 3, 5, 7, 9]
   ##
+  ## **Note**: Since this is an immediate macro, you cannot always invoke this
+  ## as ``x.toSeq``, depending on the ``x``.
+  ## See `this <manual.html#limitations-of-the-method-call-syntax>`_
+  ## for an explanation.
   var result {.gensym.}: seq[type(iter)] = @[]
   for x in iter: add(result, x)
   result
@@ -314,22 +339,22 @@ template foldl*(sequence, operation: expr): expr =
   ##
   ## The ``operation`` parameter should be an expression which uses the
   ## variables ``a`` and ``b`` for each step of the fold. Since this is a left
-  ## fold, for non associative binary operations like substraction think that
+  ## fold, for non associative binary operations like subtraction think that
   ## the sequence of numbers 1, 2 and 3 will be parenthesized as (((1) - 2) -
   ## 3).  Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     numbers = @[5, 9, 11]
   ##     addition = foldl(numbers, a + b)
-  ##     substraction = foldl(numbers, a - b)
+  ##     subtraction = foldl(numbers, a - b)
   ##     multiplication = foldl(numbers, a * b)
-  ##     words = @["nim", "rod", "is", "cool"]
+  ##     words = @["nim", "is", "cool"]
   ##     concatenation = foldl(words, a & b)
   ##   assert addition == 25, "Addition is (((5)+9)+11)"
-  ##   assert substraction == -15, "Substraction is (((5)-9)-11)"
+  ##   assert subtraction == -15, "Subtraction is (((5)-9)-11)"
   ##   assert multiplication == 495, "Multiplication is (((5)*9)*11)"
-  ##   assert concatenation == "nimrodiscool"
+  ##   assert concatenation == "nimiscool"
   assert sequence.len > 0, "Can't fold empty sequences"
   var result {.gensym.}: type(sequence[0])
   result = sequence[0]
@@ -350,22 +375,22 @@ template foldr*(sequence, operation: expr): expr =
   ##
   ## The ``operation`` parameter should be an expression which uses the
   ## variables ``a`` and ``b`` for each step of the fold. Since this is a right
-  ## fold, for non associative binary operations like substraction think that
+  ## fold, for non associative binary operations like subtraction think that
   ## the sequence of numbers 1, 2 and 3 will be parenthesized as (1 - (2 -
   ## (3))). Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     numbers = @[5, 9, 11]
   ##     addition = foldr(numbers, a + b)
-  ##     substraction = foldr(numbers, a - b)
+  ##     subtraction = foldr(numbers, a - b)
   ##     multiplication = foldr(numbers, a * b)
-  ##     words = @["nim", "rod", "is", "cool"]
+  ##     words = @["nim", "is", "cool"]
   ##     concatenation = foldr(words, a & b)
   ##   assert addition == 25, "Addition is (5+(9+(11)))"
-  ##   assert substraction == 7, "Substraction is (5-(9-(11)))"
+  ##   assert subtraction == 7, "Subtraction is (5-(9-(11)))"
   ##   assert multiplication == 495, "Multiplication is (5*(9*(11)))"
-  ##   assert concatenation == "nimrodiscool"
+  ##   assert concatenation == "nimiscool"
   assert sequence.len > 0, "Can't fold empty sequences"
   var result {.gensym.}: type(sequence[0])
   result = sequence[sequence.len - 1]
@@ -376,7 +401,7 @@ template foldr*(sequence, operation: expr): expr =
     result = operation
   result
 
-template mapIt*(seq1, typ, pred: expr): expr =
+template mapIt*(seq1, typ, op: expr): expr =
   ## Convenience template around the ``map`` proc to reduce typing.
   ##
   ## The template injects the ``it`` variable which you can use directly in an
@@ -384,35 +409,35 @@ template mapIt*(seq1, typ, pred: expr): expr =
   ## since the new returned sequence can have a different type than the
   ## original.  Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   let
   ##     nums = @[1, 2, 3, 4]
   ##     strings = nums.mapIt(string, $(4 * it))
   ##   assert strings == @["4", "8", "12", "16"]
   var result {.gensym.}: seq[typ] = @[]
   for it {.inject.} in items(seq1):
-    result.add(pred)
+    result.add(op)
   result
 
-template mapIt*(varSeq, pred: expr) =
+template mapIt*(varSeq, op: expr) =
   ## Convenience template around the mutable ``map`` proc to reduce typing.
   ##
   ## The template injects the ``it`` variable which you can use directly in an
   ## expression. The expression has to return the same type as the sequence you
   ## are mutating. Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   var nums = @[1, 2, 3, 4]
   ##   nums.mapIt(it * 3)
   ##   assert nums[0] + nums[3] == 15
   for i in 0 .. <len(varSeq):
     let it {.inject.} = varSeq[i]
-    varSeq[i] = pred
+    varSeq[i] = op
 
 template newSeqWith*(len: int, init: expr): expr =
   ## creates a new sequence, calling `init` to initialize each value. Example:
   ##
-  ## .. code-block:: nimrod
+  ## .. code-block::
   ##   var seq2D = newSeqWith(20, newSeq[bool](10))
   ##   seq2D[0][0] = true
   ##   seq2D[1][0] = true
@@ -501,27 +526,27 @@ when isMainModule:
     let
       numbers = @[5, 9, 11]
       addition = foldl(numbers, a + b)
-      substraction = foldl(numbers, a - b)
+      subtraction = foldl(numbers, a - b)
       multiplication = foldl(numbers, a * b)
-      words = @["nim", "rod", "is", "cool"]
+      words = @["nim", "is", "cool"]
       concatenation = foldl(words, a & b)
     assert addition == 25, "Addition is (((5)+9)+11)"
-    assert substraction == -15, "Substraction is (((5)-9)-11)"
+    assert subtraction == -15, "Subtraction is (((5)-9)-11)"
     assert multiplication == 495, "Multiplication is (((5)*9)*11)"
-    assert concatenation == "nimrodiscool"
+    assert concatenation == "nimiscool"
 
   block: # foldr tests
     let
       numbers = @[5, 9, 11]
       addition = foldr(numbers, a + b)
-      substraction = foldr(numbers, a - b)
+      subtraction = foldr(numbers, a - b)
       multiplication = foldr(numbers, a * b)
-      words = @["nim", "rod", "is", "cool"]
+      words = @["nim", "is", "cool"]
       concatenation = foldr(words, a & b)
     assert addition == 25, "Addition is (5+(9+(11)))"
-    assert substraction == 7, "Substraction is (5-(9-(11)))"
+    assert subtraction == 7, "Subtraction is (5-(9-(11)))"
     assert multiplication == 495, "Multiplication is (5*(9*(11)))"
-    assert concatenation == "nimrodiscool"
+    assert concatenation == "nimiscool"
 
   block: # delete tests
     let outcome = @[1,1,1,1,1,1,1,1]
@@ -580,5 +605,15 @@ when isMainModule:
     seq2D[1][0] = true
     seq2D[0][1] = true
     doAssert seq2D == @[@[true, true], @[true, false], @[false, false], @[false, false]]
+
+  block: # repeat tests
+    let
+      a = @[1, 2, 3]
+      b: seq[int] = @[]
+    
+    doAssert a.repeat(3) == @[1, 2, 3, 1, 2, 3, 1, 2, 3]
+    doAssert a.repeat(0) == @[]
+    #doAssert a.repeat(-1) == @[] # will not compile!
+    doAssert b.repeat(3) == @[]
 
   echo "Finished doc tests"

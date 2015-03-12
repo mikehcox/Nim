@@ -1,7 +1,7 @@
 /*
 
-            Nimrod's Runtime Library
-        (c) Copyright 2013 Andreas Rumpf
+            Nim's Runtime Library
+        (c) Copyright 2015 Andreas Rumpf
 
     See the file "copying.txt", included in this
     distribution, for details about the copyright.
@@ -67,7 +67,7 @@ __clang__
 #endif
 
 #if (defined(WIN32) || defined(_WIN32) || defined(__WIN32__))
-#  define NIM_THREADVAR __declspec(thread) 
+#  define NIM_THREADVAR __declspec(thread)
 #else
 #  define NIM_THREADVAR __thread
 #endif
@@ -103,7 +103,11 @@ __clang__
 #  define N_FASTCALL_PTR(rettype, name) rettype (__fastcall *name)
 #  define N_SAFECALL_PTR(rettype, name) rettype (__safecall *name)
 
-#  define N_LIB_EXPORT  extern __declspec(dllexport)
+#  ifdef __cplusplus
+#    define N_LIB_EXPORT  extern "C" __declspec(dllexport)
+#  else
+#    define N_LIB_EXPORT  extern __declspec(dllexport)
+#  endif
 #  define N_LIB_IMPORT  extern __declspec(dllimport)
 #else
 #  define N_CDECL(rettype, name) rettype name
@@ -118,7 +122,11 @@ __clang__
 #  define N_FASTCALL_PTR(rettype, name) rettype (*name)
 #  define N_SAFECALL_PTR(rettype, name) rettype (*name)
 
-#  define N_LIB_EXPORT  extern
+#  ifdef __cplusplus
+#    define N_LIB_EXPORT  extern "C"
+#  else
+#    define N_LIB_EXPORT  extern
+#  endif
 #  define N_LIB_IMPORT  extern
 #endif
 
@@ -141,9 +149,11 @@ __clang__
 /* these compilers have a fastcall so use it: */
 #  define N_NIMCALL(rettype, name) rettype __fastcall name
 #  define N_NIMCALL_PTR(rettype, name) rettype (__fastcall *name)
+#  define N_RAW_NIMCALL __fastcall
 #else
 #  define N_NIMCALL(rettype, name) rettype name /* no modifier */
 #  define N_NIMCALL_PTR(rettype, name) rettype (*name)
+#  define N_RAW_NIMCALL
 #endif
 
 #define N_CLOSURE(rettype, name) N_NIMCALL(rettype, name)
@@ -175,9 +185,9 @@ __clang__
 #  define NIM_NIL 0
 struct NimException
 {
-  NimException(struct E_Base* exp, const char* msg): exp(exp), msg(msg) {}
+  NimException(struct Exception* exp, const char* msg): exp(exp), msg(msg) {}
 
-  struct E_Base* exp;
+  struct Exception* exp;
   const char* msg;
 };
 #else
@@ -343,7 +353,7 @@ struct TFrame {
 #define nimln(n, file) \
   F.line = n; F.filename = file;
 
-#define NIM_POSIX_INIT  __attribute__((constructor)) 
+#define NIM_POSIX_INIT  __attribute__((constructor))
 
 #if defined(_MSCVER) && defined(__i386__)
 __declspec(naked) int __fastcall NimXadd(volatile int* pNum, int val) {
@@ -377,8 +387,25 @@ static inline void GCGuard (void *ptr) { asm volatile ("" :: "X" (ptr)); }
 #  define GC_GUARD
 #endif
 
-/* Test to see if nimrod and the C compiler agree on the size of a pointer.
-   On disagreement, your C compiler will say something like: 
+/* Test to see if Nim and the C compiler agree on the size of a pointer.
+   On disagreement, your C compiler will say something like:
    "error: 'assert_numbits' declared as an array with a negative size" */
 typedef int assert_numbits[sizeof(NI) == sizeof(void*) && NIM_INTBITS == sizeof(NI)*8 ? 1 : -1];
+#endif
+
+#ifdef  __cplusplus
+#  define NIM_EXTERNC extern "C"
+#else
+#  define NIM_EXTERNC
+#endif
+
+/* ---------------- platform specific includes ----------------------- */
+
+/* VxWorks related includes */
+#if defined(__VXWORKS__)
+#  include <sys/types.h>
+#  include <types/vxWind.h>
+#  include <tool/gnu/toolMacros.h>
+#elif defined(__FreeBSD__)
+#  include <sys/types.h>
 #endif

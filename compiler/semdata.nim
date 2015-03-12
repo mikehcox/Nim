@@ -1,6 +1,6 @@
 #
 #
-#           The Nimrod Compiler
+#           The Nim Compiler
 #        (c) Copyright 2012 Andreas Rumpf
 #
 #    See the file "copying.txt", included in this
@@ -35,6 +35,7 @@ type
     inTryStmt*: int           # whether we are in a try statement; works also
                               # in standalone ``except`` and ``finally``
     next*: PProcCon           # used for stacking procedure contexts
+    wasForwarded*: bool       # whether the current proc has a separate header
   
   TInstantiationPair* = object
     genericSym*: PSym
@@ -57,7 +58,7 @@ type
                                # can access private object fields
     instCounter*: int          # to prevent endless instantiations
    
-    ambiguousSymbols*: TIntSet # ids of all ambiguous symbols (cannot
+    ambiguousSymbols*: IntSet  # ids of all ambiguous symbols (cannot
                                # store this info in the syms themselves!)
     inTypeClass*: int          # > 0 if we are in a user-defined type class
     inGenericContext*: int     # > 0 if we are in a generic type
@@ -72,8 +73,7 @@ type
     libs*: TLinkedList         # all libs used by this module
     semConstExpr*: proc (c: PContext, n: PNode): PNode {.nimcall.} # for the pragmas
     semExpr*: proc (c: PContext, n: PNode, flags: TExprFlags = {}): PNode {.nimcall.}
-    semTryExpr*: proc (c: PContext, n: PNode,flags: TExprFlags = {},
-                       bufferErrors = false): PNode {.nimcall.}
+    semTryExpr*: proc (c: PContext, n: PNode,flags: TExprFlags = {}): PNode {.nimcall.}
     semTryConstExpr*: proc (c: PContext, n: PNode): PNode {.nimcall.}
     semOperand*: proc (c: PContext, n: PNode, flags: TExprFlags = {}): PNode {.nimcall.}
     semConstBoolExpr*: proc (c: PContext, n: PNode): PNode {.nimcall.} # XXX bite the bullet
@@ -83,15 +83,18 @@ type
     semInferredLambda*: proc(c: PContext, pt: TIdTable, n: PNode): PNode
     semGenerateInstance*: proc (c: PContext, fn: PSym, pt: TIdTable,
                                 info: TLineInfo): PSym
-    includedFiles*: TIntSet    # used to detect recursive include files
+    includedFiles*: IntSet    # used to detect recursive include files
     userPragmas*: TStrTable
     evalContext*: PEvalContext
-    unknownIdents*: TIntSet    # ids of all unknown identifiers to prevent
+    unknownIdents*: IntSet     # ids of all unknown identifiers to prevent
                                # naming it multiple times
     generics*: seq[TInstantiationPair] # pending list of instantiated generics to compile
     lastGenericIdx*: int      # used for the generics stack
     hloLoopDetector*: int     # used to prevent endless loops in the HLO
     inParallelStmt*: int
+    instDeepCopy*: proc (c: PContext; dc: PSym; t: PType;
+                         info: TLineInfo): PSym {.nimcall.}
+
    
 proc makeInstPair*(s: PSym, inst: PInstantiation): TInstantiationPair =
   result.genericSym = s
@@ -218,6 +221,7 @@ proc makeTypeSymNode*(c: PContext, typ: PType, info: TLineInfo): PNode =
 
 proc makeTypeFromExpr*(c: PContext, n: PNode): PType =
   result = newTypeS(tyFromExpr, c)
+  assert n != nil
   result.n = n
 
 proc newTypeWithSons*(c: PContext, kind: TTypeKind,
@@ -266,7 +270,7 @@ proc makeRangeWithStaticExpr*(c: PContext, n: PNode): PType =
 
 template rangeHasStaticIf*(t: PType): bool =
   # this accepts the ranges's node
-  t.n[1].kind == nkStaticExpr
+  t.n != nil and t.n.len > 1 and t.n[1].kind == nkStaticExpr
 
 template getStaticTypeFromRange*(t: PType): PType =
   t.n[1][0][1].typ
@@ -304,9 +308,17 @@ proc markIndirect*(c: PContext, s: PSym) {.inline.} =
 proc illFormedAst*(n: PNode) =
   globalError(n.info, errIllFormedAstX, renderTree(n, {renderNoComments}))
 
+proc illFormedAstLocal*(n: PNode) =
+  localError(n.info, errIllFormedAstX, renderTree(n, {renderNoComments}))
+
 proc checkSonsLen*(n: PNode, length: int) = 
   if sonsLen(n) != length: illFormedAst(n)
   
 proc checkMinSonsLen*(n: PNode, length: int) = 
   if sonsLen(n) < length: illFormedAst(n)
 
+proc isTopLevel*(c: PContext): bool {.inline.} = 
+  result = c.currentScope.depthLevel <= 2
+
+proc experimentalMode*(c: PContext): bool {.inline.} =
+  result = gExperimentalMode or sfExperimental in c.module.flags
